@@ -179,6 +179,8 @@ class MainWindow(QMainWindow):
     def current_workspace_path(self, path: str) -> None:
         self._current_workspace_path_val = path
         self._update_all_workspaces()
+        if hasattr(self, "_save_settings"):
+            self._save_settings()
 
     # ── init ──────────────────────────────────────────────────────────────────
 
@@ -253,6 +255,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "settings_page"):
             vis_dict = self.settings_page.tab_visibility()
             settings.setValue("tab_visibility", json.dumps(vis_dict))
+        
+        settings.sync()
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -560,6 +564,8 @@ class MainWindow(QMainWindow):
         # Let settings page redraw its own theme buttons and cards
         if hasattr(self.settings_page, "_sync_theme_buttons"):
             self.settings_page._sync_theme_buttons()
+            
+        self._save_settings()
 
     def _apply_tab_visibility(self):
         vis = self.settings_page.tab_visibility()
@@ -573,6 +579,8 @@ class MainWindow(QMainWindow):
                 btn.setVisible(True)
             else:
                 btn.setVisible(vis.get(key, True))
+                
+        self._save_settings()
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  Page builders
