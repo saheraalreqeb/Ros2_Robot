@@ -68,7 +68,10 @@ class SettingsPage(QWidget):
         """Restore previously saved tab visibility."""
         for key, cb in self._tab_checks.items():
             if key in state:
+                cb.blockSignals(True)
                 cb.setChecked(state[key])
+                cb.blockSignals(False)
+        self.tab_visibility_changed.emit()
 
     # ── build UI ──────────────────────────────────────────────────────────────
 
@@ -173,7 +176,9 @@ class SettingsPage(QWidget):
             row.setSpacing(10)
 
             cb = QCheckBox(label)
+            cb.blockSignals(True)
             cb.setChecked(True)           # default: all visible
+            cb.blockSignals(False)
             cb.setEnabled(not locked)     # Workspace always on
             cb.stateChanged.connect(lambda _: self.tab_visibility_changed.emit())
             self._tab_checks[key] = cb
