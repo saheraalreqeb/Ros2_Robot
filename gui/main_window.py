@@ -758,6 +758,15 @@ class MainWindow(QMainWindow):
         hdr.addWidget(title)
         hdr.addStretch()
 
+        btn_kill_all = _action_btn("Kill All Nodes", "fa5s.times-circle")
+        btn_kill_all.setObjectName("btnKillAllNodes")
+        btn_kill_all.setStyleSheet(
+            f"background-color: {ThemeManager.palette()['danger']}; color: white;"
+        )
+        btn_kill_all.clicked.connect(self._kill_all_running_nodes)
+        hdr.addWidget(btn_kill_all)
+        hdr.addSpacing(10)
+
         btn_refresh = _action_btn("Refresh", "fa5s.sync-alt")
         btn_refresh.clicked.connect(self._refresh_nodes_list)
         hdr.addWidget(btn_refresh)
@@ -825,6 +834,28 @@ class MainWindow(QMainWindow):
             lbl = QLabel(f"No nodes found in:\n{self.current_workspace_path}")
             lbl.setStyleSheet("font-style: italic; font-size: 13px;")
             self.nodes_flow_layout.addWidget(lbl)
+
+    def _kill_all_running_nodes(self):
+        # Terminate GUI-managed processes
+        keys = list(self.running_processes.keys())
+        for key in keys:
+            proc = self.running_processes.get(key)
+            if proc:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except Exception:
+                    proc.kill()
+        self.running_processes.clear()
+
+        # Terminate any other node processes matching active cards
+        for card in getattr(self, "active_node_cards", []):
+            pkg = card.pkg_name
+            node = card.node_name
+            self._kill_node(pkg, node)
+
+        # Refresh state
+        self._refresh_nodes_list()
 
     def _make_node_card(self, pkg_name: str, node_name: str) -> QFrame:
         card = QFrame()
