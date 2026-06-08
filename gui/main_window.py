@@ -604,6 +604,32 @@ class MainWindow(QMainWindow):
         btn_row.addStretch()
         ws_lay.addLayout(btn_row)
         layout.addWidget(ws_card)
+        layout.addSpacing(16)
+
+        # ── Structure note ──────────────────────────────────────────────────
+        note_card = QFrame()
+        note_card.setProperty("class", "card")
+        p = ThemeManager.palette()
+        note_card.setStyleSheet(
+            f"QFrame {{ "
+            f"  background-color: {p['bg_hover']}; "
+            f"  border: 1px solid {p['info']}; "
+            f"  border-radius: 6px; "
+            f"}}"
+        )
+        note_lay = QHBoxLayout(note_card)
+        note_lay.setContentsMargins(12, 10, 12, 10)
+        note_lay.setSpacing(10)
+        note_lay.addWidget(_icon_label("fa5s.info-circle", "info"), 0, Qt.AlignVCenter)
+        note_text = QLabel(
+            "Note: Workspace directories must follow the official ROS 2 folder structure "
+            "(with packages stored under a 'src/' subfolder) in order for features to function properly."
+        )
+        note_text.setWordWrap(True)
+        note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
+        note_lay.addWidget(note_text, 1)
+        layout.addWidget(note_card)
+
         layout.addSpacing(28)
 
         # ── Build section (merged from old Build tab) ──────────────────────
