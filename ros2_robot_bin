@@ -1,0 +1,40 @@
+#!/bin/bash
+# ros2_robot_bin
+# Launcher for the Ros2 Robot GUI.
+# ~/.local/bin/ros2_robot is a symlink pointing here.
+
+# Resolve the real directory of this script (following symlinks)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
+# ── 1. Source ROS2 environment if not already active ──────────────────────
+if [ -z "$ROS_DISTRO" ]; then
+    for setup in \
+        /opt/ros/humble/setup.bash \
+        /opt/ros/iron/setup.bash \
+        /opt/ros/jazzy/setup.bash \
+        /opt/ros/rolling/setup.bash; do
+        if [ -f "$setup" ]; then
+            # shellcheck disable=SC1090
+            source "$setup"
+            break
+        fi
+    done
+fi
+
+# ── 2. Display / Qt platform setup for WSL ────────────────────────────────
+export QT_QPA_PLATFORM=xcb
+
+if [ -z "$DISPLAY" ]; then
+    export DISPLAY=:0
+fi
+
+export QT_LOGGING_RULES="*.debug=false;qt.qpa.*=false"
+export PYTHONWARNINGS=ignore
+
+# ── 3. Add project to PYTHONPATH so imports work from any CWD ─────────────
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
+
+# ── 4. Launch from within the project directory (same as python3 main.py) ─
+echo "Starting Ros2 Robot..."
+cd "$SCRIPT_DIR"
+exec python3 main.py "$@"

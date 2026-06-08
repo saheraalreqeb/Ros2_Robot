@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ros2-robot"
+version = "1.0.0"
+description = "A modern GUI for managing ROS2 workspaces, built with PySide6"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [
+    { name = "Saher ALREQEB", email = "s.a.alreqeb@gmail.com" }
+]
+maintainers = [
+    { name = "Saher ALREQEB", email = "s.a.alreqeb@gmail.com" }
+]
+dependencies = [
+    "PySide6>=6.5.0",
+    "psutil>=5.9.0",
+    "PyYAML>=6.0",
+    "qtawesome>=1.3.0",
+]
+
+[project.urls]
+Homepage = "https://www.saheralreqeb.work/"
+
+[project.scripts]
+ros2_robot = "main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-qt>=4.0",
+    "pytest-mock>=3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "gui*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

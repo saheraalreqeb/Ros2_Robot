@@ -1,0 +1,76 @@
+#!/bin/bash
+# install.sh — One-command installer for Ros2 Robot
+#
+# Usage (inside WSL):
+#   bash install.sh
+#
+# What this does:
+#   1. Installs the missing Qt system library (libxcb-cursor0)
+#   2. Installs Python dependencies
+#   3. Creates a permanent `ros2_robot` command in ~/.local/bin (no sudo needed)
+#   4. Ensures ~/.local/bin is on your PATH
+
+set -e
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(dirname "$SCRIPT_PATH")"
+BIN_SRC="$REPO_DIR/ros2_robot_bin"
+LOCAL_BIN="$HOME/.local/bin"
+LINK="$LOCAL_BIN/ros2_robot"
+
+echo ""
+echo "  Ros2 Robot — Installer"
+echo "  ════════════════════════════════"
+echo "  Repo: $REPO_DIR"
+echo ""
+
+# ── 0. Remove stale /usr/local/bin copy if present ────────────────────────
+if [ -f /usr/local/bin/ros2_robot ] && [ ! -L /usr/local/bin/ros2_robot ]; then
+    echo "⚠  Stale copy found in /usr/local/bin — removing (needs sudo once)..."
+    sudo rm -f /usr/local/bin/ros2_robot
+    echo "✓  Removed"
+fi
+
+# ── 1. System dependencies ─────────────────────────────────────────────────
+echo "[ 1/4 ] Installing system dependencies..."
+sudo apt-get install -y -q libxcb-cursor0 2>/dev/null
+echo "        ✓  libxcb-cursor0"
+
+# ── 2. Python dependencies ─────────────────────────────────────────────────
+echo "[ 2/4 ] Installing Python dependencies..."
+if ! pip3 install -q -r "$REPO_DIR/requirements.txt" 2>/dev/null; then
+    # Fallback for PEP 668 externally-managed environments (e.g., Ubuntu 24.04 / Jazzy)
+    pip3 install -q --break-system-packages -r "$REPO_DIR/requirements.txt"
+fi
+echo "        ✓  PySide6, psutil, PyYAML, qtawesome"
+
+# ── 3. Create ~/.local/bin symlink ─────────────────────────────────────────
+echo "[ 3/4 ] Creating ros2_robot command..."
+mkdir -p "$LOCAL_BIN"
+rm -f "$LINK"
+ln -sf "$BIN_SRC" "$LINK"
+chmod +x "$BIN_SRC"
+echo "        ✓  $LINK -> $BIN_SRC"
+
+# ── 4. Ensure PATH includes ~/.local/bin ───────────────────────────────────
+echo "[ 4/4 ] Checking PATH..."
+BASHRC="$HOME/.bashrc"
+if ! grep -qF '.local/bin' "$BASHRC" 2>/dev/null; then
+    {
+        echo ""
+        echo "# Added by ros2_robot install.sh"
+        echo 'export PATH="$HOME/.local/bin:$PATH"'
+    } >> "$BASHRC"
+    echo "        ✓  Added ~/.local/bin to PATH in ~/.bashrc"
+else
+    echo "        ✓  ~/.local/bin already in PATH"
+fi
+
+echo ""
+echo "  ════════════════════════════════"
+echo "  Installation complete!"
+echo ""
+echo "  Run:  ros2_robot"
+echo "  (Open a new terminal if PATH was just updated)"
+echo "  ════════════════════════════════"
+echo ""
