@@ -20,9 +20,11 @@ from gui.theme import ThemeManager
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLabel, QPushButton, QListWidget, QListWidgetItem,
-    QFrame, QTextEdit, QSizePolicy,
+    QFrame, QTextEdit, QSizePolicy, QTabWidget, QTableWidget,
+    QTableWidgetItem, QHeaderView,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtGui import QColor, QFont
 
 
 # ---------------------------------------------------------------------------
@@ -240,18 +242,18 @@ class TopicInspectorPage(QWidget):
         self.lbl_topic_name.setWordWrap(True)
         details_card_layout.addWidget(self.lbl_topic_name)
 
-        self.lbl_msg_type = QLabel("")
-        self.lbl_msg_type.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
-        self.lbl_msg_type.setWordWrap(True)
-        details_card_layout.addWidget(self.lbl_msg_type)
+        self.lbl_topic_type = QLabel("")
+        self.lbl_topic_type.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        self.lbl_topic_type.setWordWrap(True)
+        details_card_layout.addWidget(self.lbl_topic_type)
 
-        self.lbl_pub_count = QLabel("")
-        self.lbl_pub_count.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
-        details_card_layout.addWidget(self.lbl_pub_count)
+        self.lbl_topic_pubs = QLabel("")
+        self.lbl_topic_pubs.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        details_card_layout.addWidget(self.lbl_topic_pubs)
 
-        self.lbl_sub_count = QLabel("")
-        self.lbl_sub_count.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
-        details_card_layout.addWidget(self.lbl_sub_count)
+        self.lbl_topic_subs = QLabel("")
+        self.lbl_topic_subs.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        details_card_layout.addWidget(self.lbl_topic_subs)
 
         # Hz row
         hz_row = QHBoxLayout()
@@ -270,10 +272,44 @@ class TopicInspectorPage(QWidget):
 
         right_layout.addWidget(self.details_card)
 
-        # -- Echo controls -------------------------------------------------
+        # -- Tab Widget for Echo and QoS Analyzer ---------------------------
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(
+            f"""
+            QTabWidget::pane {{
+                border: 1px solid {p['border']};
+                border-radius: 6px;
+                background-color: {p['bg_card']};
+            }}
+            QTabBar::tab {{
+                background-color: {p['bg_card']};
+                color: {p['text_secondary']};
+                padding: 8px 16px;
+                border: 1px solid {p['border']};
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-weight: bold;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {p['bg_selected']};
+                color: {p['text_primary']};
+                border-bottom: 2px solid {p['accent']};
+            }}
+            QTabBar::tab:hover {{
+                background-color: {p['bg_hover']};
+            }}
+            """
+        )
+
+        # Tab 1: Live Echo
+        echo_tab = QWidget()
+        echo_tab_layout = QVBoxLayout(echo_tab)
+        echo_tab_layout.setContentsMargins(10, 10, 10, 10)
+
         echo_header = QHBoxLayout()
         echo_label = QLabel("Live Echo")
-        echo_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {p['text_primary']}; margin-top: 12px;")
+        echo_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {p['text_primary']};")
         echo_header.addWidget(echo_label)
 
         self.btn_echo = QPushButton("Start Echo")
@@ -282,9 +318,8 @@ class TopicInspectorPage(QWidget):
         self.btn_echo.setEnabled(False)
         self.btn_echo.clicked.connect(self._toggle_echo)
         echo_header.addWidget(self.btn_echo, 0, Qt.AlignRight)
-        right_layout.addLayout(echo_header)
+        echo_tab_layout.addLayout(echo_header)
 
-        # -- Echo output area -----------------------------------------------
         self.echo_output = QTextEdit()
         self.echo_output.setReadOnly(True)
         self.echo_output.setStyleSheet(
@@ -301,7 +336,57 @@ class TopicInspectorPage(QWidget):
             """
         )
         self.echo_output.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_layout.addWidget(self.echo_output, 1)
+        echo_tab_layout.addWidget(self.echo_output, 1)
+        self.tabs.addTab(echo_tab, "Live Echo")
+
+        # Tab 2: QoS Analyzer
+        qos_tab = QWidget()
+        qos_tab_layout = QVBoxLayout(qos_tab)
+        qos_tab_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Warning banner
+        self.qos_warning_card = QFrame()
+        self.qos_warning_card.setFrameShape(QFrame.StyledPanel)
+        self.qos_warning_layout = QVBoxLayout(self.qos_warning_card)
+        self.lbl_qos_warning_title = QLabel("")
+        self.lbl_qos_warning_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.qos_warning_layout.addWidget(self.lbl_qos_warning_title)
+        self.lbl_qos_warning_desc = QLabel("")
+        self.lbl_qos_warning_desc.setWordWrap(True)
+        self.lbl_qos_warning_desc.setStyleSheet("font-size: 13px;")
+        self.qos_warning_layout.addWidget(self.lbl_qos_warning_desc)
+        self.qos_warning_card.hide()
+        qos_tab_layout.addWidget(self.qos_warning_card)
+
+        # QoS Details Table
+        self.qos_table = QTableWidget(0, 5)
+        self.qos_table.setHorizontalHeaderLabels([
+            "Node Name", "Role", "Reliability", "Durability", "Liveliness"
+        ])
+        self.qos_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.qos_table.setStyleSheet(
+            f"""
+            QTableWidget {{
+                background-color: {p['bg_card']};
+                gridline-color: {p['border']};
+                color: {p['text_primary']};
+                border: none;
+            }}
+            QHeaderView::section {{
+                background-color: {p['bg_input']};
+                color: {p['text_secondary']};
+                padding: 6px;
+                border: 1px solid {p['border']};
+                font-weight: bold;
+            }}
+            """
+        )
+        self.qos_table.verticalHeader().setVisible(False)
+        qos_tab_layout.addWidget(self.qos_table, 1)
+        self.tabs.addTab(qos_tab, "QoS Analyzer")
+
+        right_layout.addWidget(self.tabs, 1)
+        self.latest_qos_data = None
 
         self.splitter.addWidget(right_panel)
 
@@ -407,7 +492,7 @@ class TopicInspectorPage(QWidget):
             self._info_worker.terminate()
             self._info_worker.wait()
             
-        cmd = self._build_cmd(f"ros2 topic info {topic}")
+        cmd = self._build_cmd(f"ros2 topic info -v {topic}")
         self._info_worker = _TopicInfoWorker(cmd, self)
         self._info_worker.result_ready.connect(self._on_info_refreshed)
         self._info_worker.start()
@@ -424,20 +509,29 @@ class TopicInspectorPage(QWidget):
         self.lbl_topic_pubs.setText(f"Publishers: {pubs}")
         self.lbl_topic_subs.setText(f"Subscribers: {subs}")
 
+        # Parse detailed verbose QoS information and update the QoS UI
+        self.latest_qos_data = self._parse_verbose_info(info_output)
+        self._update_qos_ui(self.latest_qos_data)
+
     def _clear_details(self):
         """Reset the right panel to its empty state."""
         self._stop_echo()
         self._current_topic = None
         self.lbl_topic_name.setText("Select a topic from the list")
-        self.lbl_msg_type.setText("")
-        self.lbl_pub_count.setText("")
-        self.lbl_sub_count.setText("")
+        self.lbl_topic_type.setText("")
+        self.lbl_topic_pubs.setText("")
+        self.lbl_topic_subs.setText("")
         self.lbl_hz.setText("")
         self.btn_measure_hz.setEnabled(False)
         self.btn_echo.setEnabled(False)
         self.btn_echo.setText("Start Echo")
         self.btn_echo.setStyleSheet("")
         self.echo_output.clear()
+        
+        # QoS cleanups
+        self.qos_warning_card.hide()
+        self.qos_table.setRowCount(0)
+        self.latest_qos_data = None
 
     @staticmethod
     def _parse_info(info_text: str) -> tuple:
@@ -448,13 +542,16 @@ class TopicInspectorPage(QWidget):
             Publisher count: 1
             Subscription count: 2
 
-        Returns (publisher_count, subscriber_count) as strings.
+        Returns (type_str, publisher_count, subscriber_count) as strings.
         """
+        t_type = "UNKNOWN"
         pub = "?"
         sub = "?"
         for line in info_text.splitlines():
             lower = line.lower()
-            if "publisher count" in lower:
+            if lower.startswith("type:"):
+                t_type = line.split(":", 1)[1].strip()
+            elif "publisher count" in lower:
                 m = re.search(r"(\d+)", line)
                 if m:
                     pub = m.group(1)
@@ -462,7 +559,207 @@ class TopicInspectorPage(QWidget):
                 m = re.search(r"(\d+)", line)
                 if m:
                     sub = m.group(1)
-        return pub, sub
+        return t_type, pub, sub
+
+    @staticmethod
+    def _parse_verbose_info(info_text: str) -> dict:
+        import re
+        
+        publishers = []
+        subscribers = []
+        
+        # Split by "Node name:" to isolate each endpoint block
+        blocks = info_text.split("Node name:")
+        
+        for block in blocks[1:]:
+            block_content = "Node name:" + block
+            
+            node_name = "?"
+            node_ns = "?"
+            endpoint_type = ""
+            reliability = "UNKNOWN"
+            durability = "UNKNOWN"
+            liveliness = "UNKNOWN"
+            
+            node_name_match = re.search(r"Node name:\s*(.*)", block_content)
+            if node_name_match:
+                node_name = node_name_match.group(1).strip()
+                
+            node_ns_match = re.search(r"Node namespace:\s*(.*)", block_content)
+            if node_ns_match:
+                node_ns = node_ns_match.group(1).strip()
+                
+            endpoint_type_match = re.search(r"Endpoint type:\s*(.*)", block_content)
+            if endpoint_type_match:
+                endpoint_type = endpoint_type_match.group(1).strip().upper()
+                
+            reliability_match = re.search(r"Reliability:\s*(\w+)", block_content)
+            if reliability_match:
+                reliability = reliability_match.group(1).strip()
+                
+            durability_match = re.search(r"Durability:\s*(\w+)", block_content)
+            if durability_match:
+                durability = durability_match.group(1).strip()
+                
+            liveliness_match = re.search(r"Liveliness:\s*(\w+)", block_content)
+            if liveliness_match:
+                liveliness = liveliness_match.group(1).strip()
+                
+            def clean_policy(val):
+                return val.replace("RMW_QOS_POLICY_RELIABILITY_", "").replace("RMW_QOS_POLICY_DURABILITY_", "").replace("RMW_QOS_POLICY_LIVELINESS_", "")
+            
+            reliability = clean_policy(reliability)
+            durability = clean_policy(durability)
+            liveliness = clean_policy(liveliness)
+            
+            endpoint = {
+                "node_name": node_name,
+                "node_namespace": node_ns,
+                "reliability": reliability,
+                "durability": durability,
+                "liveliness": liveliness
+            }
+            
+            if "PUBLISHER" in endpoint_type:
+                publishers.append(endpoint)
+            elif "SUBSCRIBER" in endpoint_type or "SUBSCRIPTION" in endpoint_type:
+                subscribers.append(endpoint)
+                
+        # Perform QoS mismatch analysis
+        mismatches = []
+        for pub in publishers:
+            for sub in subscribers:
+                # 1. Reliability mismatch: Publisher offered is BEST_EFFORT and Subscriber requested is RELIABLE
+                if pub["reliability"] == "BEST_EFFORT" and sub["reliability"] == "RELIABLE":
+                    mismatches.append({
+                        "type": "Reliability",
+                        "pub_node": pub["node_name"],
+                        "sub_node": sub["node_name"],
+                        "details": "Publisher offered BEST_EFFORT, but Subscriber requested RELIABLE."
+                    })
+                # 2. Durability mismatch: Publisher offered is VOLATILE and Subscriber requested is TRANSIENT_LOCAL
+                if pub["durability"] == "VOLATILE" and sub["durability"] == "TRANSIENT_LOCAL":
+                    mismatches.append({
+                        "type": "Durability",
+                        "pub_node": pub["node_name"],
+                        "sub_node": sub["node_name"],
+                        "details": "Publisher offered VOLATILE, but Subscriber requested TRANSIENT_LOCAL."
+                    })
+                # 3. Liveliness mismatch
+                def liveliness_rank(policy):
+                    if policy == 'MANUAL_BY_TOPIC':
+                        return 2
+                    if policy == 'MANUAL_BY_NODE':
+                        return 1
+                    return 0
+                
+                pub_l_rank = liveliness_rank(pub["liveliness"])
+                sub_l_rank = liveliness_rank(sub["liveliness"])
+                if pub_l_rank < sub_l_rank:
+                    mismatches.append({
+                        "type": "Liveliness",
+                        "pub_node": pub["node_name"],
+                        "sub_node": sub["node_name"],
+                        "details": f"Publisher offered Liveliness '{pub['liveliness']}', but Subscriber requested '{sub['liveliness']}'."
+                    })
+                    
+        return {
+            "publishers": publishers,
+            "subscribers": subscribers,
+            "mismatches": mismatches
+        }
+
+    def _update_qos_ui(self, qos_data: dict):
+        p = ThemeManager.palette()
+        mismatches = qos_data.get("mismatches", [])
+        
+        if mismatches:
+            self.qos_warning_card.show()
+            desc = ""
+            for m in mismatches:
+                desc += f"• <b>{m['type']} Mismatch</b> on subscriber <code>{m['sub_node']}</code>:<br>  {m['details']}<br><br>"
+            if desc.endswith("<br><br>"):
+                desc = desc[:-8]
+            self.lbl_qos_warning_desc.setText(desc)
+            self.qos_warning_card.setStyleSheet(
+                f"""
+                QFrame {{
+                    background-color: rgba(239, 68, 68, 0.1);
+                    border: 1px solid {p['danger']};
+                    border-radius: 6px;
+                    padding: 12px;
+                }}
+                """
+            )
+            self.lbl_qos_warning_title.setText("⚠️ QoS Mismatches Detected!")
+            self.lbl_qos_warning_title.setStyleSheet(f"color: {p['danger']}; font-weight: bold; font-size: 14px;")
+        else:
+            pubs = qos_data.get("publishers", [])
+            subs = qos_data.get("subscribers", [])
+            if pubs and subs:
+                self.qos_warning_card.show()
+                self.lbl_qos_warning_title.setText("✅ QoS Profile Compatible")
+                self.lbl_qos_warning_title.setStyleSheet(f"color: {p['success']}; font-weight: bold; font-size: 14px;")
+                self.lbl_qos_warning_desc.setText("All publishers and subscribers on this topic have compatible QoS policies.")
+                self.qos_warning_card.setStyleSheet(
+                    f"""
+                    QFrame {{
+                        background-color: rgba(34, 197, 94, 0.1);
+                        border: 1px solid {p['success']};
+                        border-radius: 6px;
+                        padding: 12px;
+                    }}
+                    """
+                )
+            else:
+                self.qos_warning_card.hide()
+
+        self.qos_table.setRowCount(0)
+        endpoints = []
+        for pub in qos_data.get("publishers", []):
+            endpoints.append((pub, "Publisher"))
+        for sub in qos_data.get("subscribers", []):
+            endpoints.append((sub, "Subscriber"))
+            
+        self.qos_table.setRowCount(len(endpoints))
+        for idx, (ep, role) in enumerate(endpoints):
+            has_reliability_mismatch = any(
+                (m["type"] == "Reliability" and (m["pub_node"] == ep["node_name"] or m["sub_node"] == ep["node_name"]))
+                for m in mismatches
+            )
+            has_durability_mismatch = any(
+                (m["type"] == "Durability" and (m["pub_node"] == ep["node_name"] or m["sub_node"] == ep["node_name"]))
+                for m in mismatches
+            )
+            has_liveliness_mismatch = any(
+                (m["type"] == "Liveliness" and (m["pub_node"] == ep["node_name"] or m["sub_node"] == ep["node_name"]))
+                for m in mismatches
+            )
+            
+            item_node = QTableWidgetItem(ep["node_name"])
+            item_role = QTableWidgetItem(role)
+            item_rel = QTableWidgetItem(ep["reliability"])
+            item_dur = QTableWidgetItem(ep["durability"])
+            item_liv = QTableWidgetItem(ep["liveliness"])
+            
+            for item in [item_node, item_role, item_rel, item_dur, item_liv]:
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                
+            if has_reliability_mismatch:
+                item_rel.setForeground(QColor(p["danger"]))
+                item_rel.setFont(QFont("Segoe UI", -1, QFont.Bold))
+            if has_durability_mismatch:
+                item_dur.setForeground(QColor(p["danger"]))
+                item_dur.setFont(QFont("Segoe UI", -1, QFont.Bold))
+            if has_liveliness_mismatch:
+                item_liv.setForeground(QColor(p["danger"]))
+                item_liv.setFont(QFont("Segoe UI", -1, QFont.Bold))
+                
+            self.qos_table.setItem(idx, 0, item_node)
+            self.qos_table.setItem(idx, 1, item_role)
+            self.qos_table.setItem(idx, 2, item_rel)
+            self.qos_table.setItem(idx, 3, item_dur)
+            self.qos_table.setItem(idx, 4, item_liv)
 
     # ------------------------------------------------------------------
     #  Hz measurement
@@ -581,9 +878,9 @@ class TopicInspectorPage(QWidget):
             """
         )
         self.lbl_topic_name.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {p['text_primary']};")
-        self.lbl_msg_type.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
-        self.lbl_pub_count.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
-        self.lbl_sub_count.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        self.lbl_topic_type.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        self.lbl_topic_pubs.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
+        self.lbl_topic_subs.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
         self.lbl_hz.setStyleSheet(f"color: {p['info']}; font-size: 14px; margin-left: 10px;")
         self.echo_output.setStyleSheet(
             f"""
@@ -598,6 +895,52 @@ class TopicInspectorPage(QWidget):
             }}
             """
         )
+        self.tabs.setStyleSheet(
+            f"""
+            QTabWidget::pane {{
+                border: 1px solid {p['border']};
+                border-radius: 6px;
+                background-color: {p['bg_card']};
+            }}
+            QTabBar::tab {{
+                background-color: {p['bg_card']};
+                color: {p['text_secondary']};
+                padding: 8px 16px;
+                border: 1px solid {p['border']};
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-weight: bold;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {p['bg_selected']};
+                color: {p['text_primary']};
+                border-bottom: 2px solid {p['accent']};
+            }}
+            QTabBar::tab:hover {{
+                background-color: {p['bg_hover']};
+            }}
+            """
+        )
+        self.qos_table.setStyleSheet(
+            f"""
+            QTableWidget {{
+                background-color: {p['bg_card']};
+                gridline-color: {p['border']};
+                color: {p['text_primary']};
+                border: none;
+            }}
+            QHeaderView::section {{
+                background-color: {p['bg_input']};
+                color: {p['text_secondary']};
+                padding: 6px;
+                border: 1px solid {p['border']};
+                font-weight: bold;
+            }}
+            """
+        )
         self.splitter.setStyleSheet(
             f"QSplitter::handle {{ background-color: {p['border']}; }}"
         )
+        if hasattr(self, 'latest_qos_data') and self.latest_qos_data:
+            self._update_qos_ui(self.latest_qos_data)

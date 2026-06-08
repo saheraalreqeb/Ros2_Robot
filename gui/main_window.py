@@ -31,7 +31,7 @@ import subprocess
 
 import psutil
 import qtawesome as qta
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -166,6 +166,13 @@ class MainWindow(QMainWindow):
         if os.name == "nt":
             self.cli.use_wsl = True
         self.running_processes: dict = {}
+        self.active_node_cards: list = []
+
+        # Periodic Resource Monitor Timer
+        self.node_monitor_timer = QTimer(self)
+        self.node_monitor_timer.setInterval(2000)
+        self.node_monitor_timer.timeout.connect(self._update_node_resources)
+        self.node_monitor_timer.start()
 
         # Apply default dark theme (replaces styles.qss)
         from PySide6.QtWidgets import QApplication
@@ -717,6 +724,7 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _refresh_nodes_list(self):
+        self.active_node_cards = []
         while self.nodes_flow_layout.count():
             item = self.nodes_flow_layout.takeAt(0)
             if item.widget():
@@ -732,6 +740,7 @@ class MainWindow(QMainWindow):
                 has_nodes = True
                 card = self._make_node_card(pkg_name, node_name)
                 self.nodes_flow_layout.addWidget(card)
+                self.active_node_cards.append(card)
 
         if not has_nodes:
             lbl = QLabel(f"No nodes found in:\n{self.current_workspace_path}")
@@ -742,7 +751,7 @@ class MainWindow(QMainWindow):
         card = QFrame()
         card.setProperty("class", "card")
         card.setFixedWidth(260)
-        card.setMinimumHeight(140)
+        card.setMinimumHeight(180)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(6)
@@ -758,6 +767,27 @@ class MainWindow(QMainWindow):
         lbl_pkg = QLabel(f"pkg: {pkg_name}")
         lbl_pkg.setStyleSheet("font-size: 12px; opacity: 0.6;")
         lay.addWidget(lbl_pkg)
+
+        # Resource Monitor Labels
+        lbl_cpu = QLabel("CPU: --")
+        lbl_cpu.setStyleSheet("font-size: 12px; opacity: 0.8;")
+        lbl_mem = QLabel("Memory: --")
+        lbl_mem.setStyleSheet("font-size: 12px; opacity: 0.8;")
+        lbl_threads = QLabel("Threads: --")
+        lbl_threads.setStyleSheet("font-size: 12px; opacity: 0.8;")
+        
+        lay.addWidget(lbl_cpu)
+        lay.addWidget(lbl_mem)
+        lay.addWidget(lbl_threads)
+        
+        # Attach labels to card
+        card.lbl_cpu = lbl_cpu
+        card.lbl_mem = lbl_mem
+        card.lbl_threads = lbl_threads
+        card.pkg_name = pkg_name
+        card.node_name = node_name
+        card.process_obj = None
+
         lay.addStretch()
 
         is_running = self._is_node_running(pkg_name, node_name)
@@ -869,6 +899,69 @@ class MainWindow(QMainWindow):
             btn.setStyleSheet(
                 f"background-color: {ThemeManager.palette()['danger']}; color: white;"
             )
+
+    def _update_node_resources(self):
+        # Update metrics only if nodes page is active (stack index 2)
+        if self.content_stack.currentIndex() != 2:
+            return
+
+        for card in getattr(self, "active_node_cards", []):
+            pkg = card.pkg_name
+            node = card.node_name
+
+            # Check if cached process is still running and is correct
+            proc = card.process_obj
+            is_running = False
+            if proc:
+                try:
+                    if proc.is_running():
+                        cmdline = proc.cmdline()
+                        cmd_str = " ".join(cmdline) if cmdline else ""
+                        target_path = f"install/{pkg}/lib/{pkg}/{node}"
+                        target_cmd = f"ros2 run {pkg} {node}"
+                        if (target_path in cmd_str or target_cmd in cmd_str) and not any(x in cmd_str for x in ("pgrep", "nano", "vim")):
+                            is_running = True
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            if not is_running:
+                proc = None
+                target_path = f"install/{pkg}/lib/{pkg}/{node}"
+                target_cmd = f"ros2 run {pkg} {node}"
+                # Search system processes
+                for p_iter in psutil.process_iter(["cmdline"]):
+                    try:
+                        cmdline = p_iter.info.get("cmdline")
+                        if not cmdline:
+                            continue
+                        cmd_str = " ".join(cmdline)
+                        if (target_path in cmd_str or target_cmd in cmd_str) and not any(x in cmd_str for x in ("pgrep", "nano", "vim")):
+                            proc = p_iter
+                            break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                card.process_obj = proc
+
+            if proc:
+                try:
+                    # Query metrics
+                    cpu = proc.cpu_percent(interval=None)
+                    mem_rss = proc.memory_info().rss / (1024 * 1024)
+                    threads = proc.num_threads()
+
+                    card.lbl_cpu.setText(f"CPU: {cpu:.1f}%")
+                    card.lbl_mem.setText(f"Memory: {mem_rss:.1f} MB")
+                    card.lbl_threads.setText(f"Threads: {threads}")
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    card.lbl_cpu.setText("CPU: --")
+                    card.lbl_mem.setText("Memory: --")
+                    card.lbl_threads.setText("Threads: --")
+                    card.process_obj = None
+            else:
+                card.lbl_cpu.setText("CPU: --")
+                card.lbl_mem.setText("Memory: --")
+                card.lbl_threads.setText("Threads: --")
+                card.process_obj = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  Build logic
