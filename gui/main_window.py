@@ -215,8 +215,44 @@ class MainWindow(QMainWindow):
 
         self._setup_sidebar()
         self._setup_content_area()
+        self._load_settings()
         self._update_all_workspaces()
         self.statusBar().showMessage("Ready  ·  Ros2 Robot")
+
+    def _load_settings(self):
+        from PySide6.QtCore import QSettings
+        import json
+        settings = QSettings("Ros2Robot", "Ros2Robot")
+
+        # 1. Workspace
+        ws_path = settings.value("workspace_path", "")
+        if ws_path and os.path.exists(ws_path):
+            self._current_workspace_path_val = ws_path
+
+        # 2. Theme
+        theme = settings.value("theme", "dark")
+        self._on_theme_changed(theme)
+
+        # 3. Tab Visibility
+        vis_json = settings.value("tab_visibility", "{}")
+        try:
+            vis_dict = json.loads(vis_json)
+            if vis_dict and hasattr(self, "settings_page"):
+                self.settings_page.set_tab_visibility(vis_dict)
+                self._apply_tab_visibility()
+        except Exception:
+            pass
+
+    def _save_settings(self):
+        from PySide6.QtCore import QSettings
+        import json
+        settings = QSettings("Ros2Robot", "Ros2Robot")
+        settings.setValue("workspace_path", self.current_workspace_path)
+        settings.setValue("theme", ThemeManager.current())
+        
+        if hasattr(self, "settings_page"):
+            vis_dict = self.settings_page.tab_visibility()
+            settings.setValue("tab_visibility", json.dumps(vis_dict))
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -1308,6 +1344,7 @@ class MainWindow(QMainWindow):
     # ── Window close ──────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
+        self._save_settings()
         # Terminate running launches
         if hasattr(self, "launch_manager_page"):
             for _path, proc in list(
