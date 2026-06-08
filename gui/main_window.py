@@ -912,6 +912,25 @@ class MainWindow(QMainWindow):
             self.lbl_build_status.show()
             QMessageBox.critical(self, "Build Error", f"colcon build failed:\n{output}")
 
+    def _auto_build_and_resource(self):
+        if hasattr(self, "_bg_build_thread") and self._bg_build_thread.isRunning():
+            return
+        self.statusBar().showMessage("Workspace changed. Running background colcon build …")
+        self._bg_build_thread = BuildThread(
+            self.current_workspace_path,
+            use_wsl=bool(self.cli and self.cli.use_wsl),
+        )
+        self._bg_build_thread.finished_signal.connect(self._on_bg_build_finished)
+        self._bg_build_thread.start()
+
+    def _on_bg_build_finished(self, success: bool, output: str):
+        if success:
+            self.statusBar().showMessage("Workspace resourced successfully (build complete).", 5000)
+            self._refresh_packages()
+            self._refresh_nodes_list()
+        else:
+            self.statusBar().showMessage("Background workspace sourcing/build failed.", 5000)
+
     # ═══════════════════════════════════════════════════════════════════════════
     #  Workspace helpers
     # ═══════════════════════════════════════════════════════════════════════════
@@ -979,6 +998,7 @@ class MainWindow(QMainWindow):
                     self, "Success",
                     f"Package '{pkg_name}' created.\n\n{output}"
                 )
+                self._auto_build_and_resource()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
 
@@ -1029,6 +1049,7 @@ class MainWindow(QMainWindow):
                     self, "Success",
                     f"Node '{node_name}' added to '{pkg_name}'."
                 )
+                self._auto_build_and_resource()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
 
