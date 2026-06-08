@@ -42,7 +42,7 @@ Choose one of the two methods below to install **Ros2 Robot**. Method 1 is recom
 Open your terminal and run the following command. This automatically downloads the installer, clones the repository to your home directory (`~/Ros2_Robot`), installs all dependencies, and configures the `ros2_robot` global command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/saher-m/Ros2_Robot/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/saheraalreqeb/Ros2_Robot/main/install.sh | bash
 ```
 
 ---
@@ -53,7 +53,7 @@ If you prefer to clone the repository to a custom location (e.g., for code modif
 
 #### 1. Clone the repository and enter the directory
 ```bash
-git clone https://github.com/saher-m/Ros2_Robot.git
+git clone https://github.com/saheraalreqeb/Ros2_Robot.git
 cd Ros2_Robot
 ```
 

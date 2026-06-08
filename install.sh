@@ -27,7 +27,7 @@ else
         sudo apt-get update -q && sudo apt-get install -y -q git
     fi
     rm -rf "$INSTALL_DIR"
-    git clone https://github.com/saher-m/Ros2_Robot.git "$INSTALL_DIR"
+    git clone https://github.com/saheraalreqeb/Ros2_Robot.git "$INSTALL_DIR"
     REPO_DIR="$INSTALL_DIR"
 fi
 
