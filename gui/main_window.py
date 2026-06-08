@@ -64,6 +64,8 @@ from gui.theme import ThemeManager
 from gui.tools_hub import ToolsHubPage
 from gui.topic_inspector import TopicInspectorPage
 from gui.visualizer import VisualizerPage
+from gui.dds_troubleshooter import DDSTroubleshooterPage
+from gui.log_viewer import UnifiedLogViewerPage
 
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
@@ -104,34 +106,54 @@ class BuildThread(QThread):
             self.finished_signal.emit(False, str(exc))
 
 
+class ProcessLogReader(QThread):
+    new_line = Signal(str, str) # (source, line)
+
+    def __init__(self, source_name: str, process: subprocess.Popen, parent=None):
+        super().__init__(parent)
+        self.source_name = source_name
+        self.process = process
+
+    def run(self):
+        try:
+            for line in iter(self.process.stdout.readline, ""):
+                if line:
+                    self.new_line.emit(self.source_name, line.rstrip("\n\r"))
+        except Exception:
+            pass
+
 # ─── Sidebar nav entry definition ─────────────────────────────────────────────
 
 _NAV_ENTRIES = [
     # (page_id, attr_name,   label,            icon_name,             refresh_method_or_None)
-    (0, "btn_workspace",  "Workspace",       "fa5s.folder-open",    None),
-    (1, "btn_packages",   "Packages",        "fa5s.box",            None),
-    (2, "btn_nodes",      "Nodes",           "fa5s.microchip",      "_refresh_nodes_list"),
-    (3, "btn_topics",     "Topic Inspector", "fa5s.satellite-dish", "_refresh_topics"),
-    (4, "btn_launch",     "Launch Manager",  "fa5s.rocket",         "_refresh_launch"),
-    (5, "btn_params",     "Parameters",      "fa5s.sliders-h",      "_refresh_params"),
-    (6, "btn_visualizer", "Visualizer",      "fa5s.project-diagram","_refresh_visualizer"),
-    (7, "btn_bags",       "Bag Manager",     "fa5s.database",       "_refresh_bags"),
-    (8, "btn_tools",      "Tools Hub",       "fa5s.tools",          "_refresh_tools"),
-    (9, "btn_settings",   "Settings",        "fa5s.cog",            None),
+    (0, "btn_workspace",      "Workspace",         "fa5s.folder-open",    None),
+    (1, "btn_packages",       "Packages",          "fa5s.box",            None),
+    (2, "btn_nodes",          "Nodes",             "fa5s.microchip",      "_refresh_nodes_list"),
+    (3, "btn_topics",         "Topic Inspector",   "fa5s.satellite-dish", "_refresh_topics"),
+    (4, "btn_launch",         "Launch Manager",    "fa5s.rocket",         "_refresh_launch"),
+    (5, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
+    (6, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
+    (7, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
+    (8, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
+    (9, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
+    (10, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
+    (11, "btn_settings",      "Settings",          "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
 _TAB_KEY_FOR_BTN = {
-    "btn_workspace":  "workspace",
-    "btn_packages":   "packages",
-    "btn_nodes":      "nodes",
-    "btn_visualizer": "visualizer",
-    "btn_launch":     "launch",
-    "btn_tools":      "tools",
-    "btn_topics":     "topics",
-    "btn_params":     "params",
-    "btn_bags":       "bags",
-    "btn_settings":   "settings",
+    "btn_workspace":      "workspace",
+    "btn_packages":       "packages",
+    "btn_nodes":          "nodes",
+    "btn_topics":         "topics",
+    "btn_launch":         "launch",
+    "btn_logs":           "logs",
+    "btn_troubleshooter": "troubleshooter",
+    "btn_params":         "params",
+    "btn_visualizer":     "visualizer",
+    "btn_bags":           "bags",
+    "btn_tools":          "tools",
+    "btn_settings":       "settings",
 }
 
 
@@ -288,11 +310,16 @@ class MainWindow(QMainWindow):
         self.nodes_page        = self._create_nodes_page()       # 2
         self.topic_inspector_page = TopicInspectorPage(self.cli) # 3
         self.launch_manager_page  = LaunchManagerPage(self.cli)  # 4
-        self.parameter_manager_page = ParameterManagerPage(self.cli)  # 5
-        self.visualizer_page   = VisualizerPage(self.cli)        # 6
-        self.bag_manager_page  = BagManagerPage(self.cli)        # 7
-        self.tools_hub_page    = ToolsHubPage(self.cli)          # 8
-        self.settings_page     = self._create_settings_page()   # 9
+        self.log_viewer_page      = UnifiedLogViewerPage(self.cli) # 5
+        self.dds_troubleshooter_page = DDSTroubleshooterPage(self.cli) # 6
+        self.parameter_manager_page = ParameterManagerPage(self.cli)  # 7
+        self.visualizer_page   = VisualizerPage(self.cli)        # 8
+        self.bag_manager_page  = BagManagerPage(self.cli)        # 9
+        self.tools_hub_page    = ToolsHubPage(self.cli)          # 10
+        self.settings_page     = self._create_settings_page()   # 11
+
+        # Connect launch logs to unified log viewer
+        self.launch_manager_page.log_emitted.connect(self._on_node_log_received)
 
         for page in [
             self.workspace_page,   # 0
@@ -300,11 +327,13 @@ class MainWindow(QMainWindow):
             self.nodes_page,       # 2
             self.topic_inspector_page,  # 3
             self.launch_manager_page,   # 4
-            self.parameter_manager_page,  # 5
-            self.visualizer_page,  # 6
-            self.bag_manager_page, # 7
-            self.tools_hub_page,   # 8
-            self.settings_page,    # 9
+            self.log_viewer_page,       # 5
+            self.dds_troubleshooter_page, # 6
+            self.parameter_manager_page,  # 7
+            self.visualizer_page,  # 8
+            self.bag_manager_page, # 9
+            self.tools_hub_page,   # 10
+            self.settings_page,    # 11
         ]:
             self.content_stack.addWidget(page)
 
@@ -320,10 +349,11 @@ class MainWindow(QMainWindow):
             2: self._refresh_nodes_list,
             3: self._refresh_topics,
             4: self._refresh_launch,
-            5: self._refresh_params,
-            6: self._refresh_visualizer,
-            7: self._refresh_bags,
-            8: self._refresh_tools,
+            5: self._refresh_logs,
+            7: self._refresh_params,
+            8: self._refresh_visualizer,
+            9: self._refresh_bags,
+            10: self._refresh_tools,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
@@ -469,6 +499,14 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════════════════════════
     #  Page builders
     # ═══════════════════════════════════════════════════════════════════════════
+
+    def _on_node_log_received(self, source: str, line: str):
+        if hasattr(self, "log_viewer_page"):
+            self.log_viewer_page.append_live_log(source, line)
+
+    def _refresh_logs(self):
+        if hasattr(self, "log_viewer_page"):
+            self.log_viewer_page.refresh_log_files()
 
     # ── Workspace page (includes Build section) ────────────────────────────────
 
@@ -892,13 +930,24 @@ class MainWindow(QMainWindow):
                 run_cmd = ["bash", "-c", cmd]
                 cwd = self.current_workspace_path
 
-            proc = subprocess.Popen(run_cmd, cwd=cwd)
+            proc = subprocess.Popen(
+                run_cmd,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
             self.running_processes[proc_key] = proc
             btn.setText("  Stop")
             btn.setIcon(ThemeManager.icon("fa5s.stop-circle", "danger"))
             btn.setStyleSheet(
                 f"background-color: {ThemeManager.palette()['danger']}; color: white;"
             )
+
+            # Start process output reader thread
+            reader = ProcessLogReader(f"Node: {pkg_name}/{node_name}", proc, self)
+            reader.new_line.connect(self._on_node_log_received)
+            reader.start()
 
     def _update_node_resources(self):
         # Update metrics only if nodes page is active (stack index 2)

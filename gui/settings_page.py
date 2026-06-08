@@ -36,16 +36,18 @@ class SettingsPage(QWidget):
     # Tabs the user can show / hide.
     # Format:  (key, display_label, always_visible)
     _TAB_DEFS: list[tuple[str, str, bool]] = [
-        ("workspace",  "Workspace",        True),   # always shown
-        ("packages",   "Packages",         False),
-        ("nodes",      "Nodes",            False),
-        ("topics",     "Topic Inspector",  False),
-        ("launch",     "Launch Manager",   False),
-        ("params",     "Parameters",       False),
-        ("visualizer", "Visualizer",       False),
-        ("bags",       "Bag Manager",      False),
-        ("tools",      "Tools Hub",        False),
-        ("settings",   "Settings",         True),   # always shown
+        ("workspace",      "Workspace",         True),   # always shown
+        ("packages",       "Packages",          False),
+        ("nodes",          "Nodes",             False),
+        ("topics",         "Topic Inspector",   False),
+        ("launch",         "Launch Manager",    False),
+        ("logs",           "Log Viewer",        False),
+        ("troubleshooter", "DDS Troubleshooter",False),
+        ("params",         "Parameters",        False),
+        ("visualizer",     "Visualizer",        False),
+        ("bags",           "Bag Manager",       False),
+        ("tools",          "Tools Hub",         False),
+        ("settings",       "Settings",          True),   # always shown
     ]
 
 

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QMessageBox, QFormLayout, QGroupBox,
     QSizePolicy, QAbstractItemView
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, Signal
 
 from core.workspace import ROS2Workspace
 from gui.flow_layout import FlowLayout
@@ -44,6 +44,7 @@ COLOR_ORANGE   = "#e67e22"
 
 class LaunchManagerPage(QWidget):
     """Page that lists existing launch files and lets users create new ones."""
+    log_emitted = Signal(str, str)
 
     def __init__(self, cli=None, parent=None):
         super().__init__(parent)
@@ -378,6 +379,7 @@ class LaunchManagerPage(QWidget):
         reader = _Reader(proc)
         reader.moveToThread(thread)
         reader.line_ready.connect(txt.appendPlainText)
+        reader.line_ready.connect(lambda line, f=filename: self.log_emitted.emit(f"Launch: {f}", line))
         reader.done.connect(thread.quit)
         thread.started.connect(reader.run)
         thread.start()
