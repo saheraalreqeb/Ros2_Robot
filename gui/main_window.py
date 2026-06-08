@@ -221,24 +221,33 @@ class MainWindow(QMainWindow):
         self._update_all_workspaces()
         self.statusBar().showMessage("Ready  ·  Ros2 Robot")
 
+    def _get_settings_path(self):
+        import os
+        return os.path.expanduser("~/.ros2_robot_settings.json")
+
     def _load_settings(self):
-        from PySide6.QtCore import QSettings
         import json
-        settings = QSettings("Ros2Robot", "Ros2Robot")
-
-        # 1. Workspace
-        ws_path = settings.value("workspace_path", "")
-        if ws_path and os.path.exists(ws_path):
-            self._current_workspace_path_val = ws_path
-
-        # 2. Theme
-        theme = settings.value("theme", "dark")
-        self._on_theme_changed(theme)
-
-        # 3. Tab Visibility
-        vis_json = settings.value("tab_visibility", "{}")
+        import os
+        
+        path = self._get_settings_path()
+        if not os.path.exists(path):
+            return
+            
         try:
-            vis_dict = json.loads(vis_json)
+            with open(path, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+                
+            # 1. Workspace
+            ws_path = settings.get("workspace_path", "")
+            if ws_path and os.path.exists(ws_path):
+                self._current_workspace_path_val = ws_path
+                
+            # 2. Theme
+            theme = settings.get("theme", "dark")
+            self._on_theme_changed(theme)
+            
+            # 3. Tab Visibility
+            vis_dict = settings.get("tab_visibility", {})
             if vis_dict and hasattr(self, "settings_page"):
                 self.settings_page.set_tab_visibility(vis_dict)
                 self._apply_tab_visibility()
@@ -246,17 +255,20 @@ class MainWindow(QMainWindow):
             pass
 
     def _save_settings(self):
-        from PySide6.QtCore import QSettings
         import json
-        settings = QSettings("Ros2Robot", "Ros2Robot")
-        settings.setValue("workspace_path", self.current_workspace_path)
-        settings.setValue("theme", ThemeManager.current())
+        
+        settings = {}
+        settings["workspace_path"] = self.current_workspace_path
+        settings["theme"] = ThemeManager.current()
         
         if hasattr(self, "settings_page"):
-            vis_dict = self.settings_page.tab_visibility()
-            settings.setValue("tab_visibility", json.dumps(vis_dict))
-        
-        settings.sync()
+            settings["tab_visibility"] = self.settings_page.tab_visibility()
+            
+        try:
+            with open(self._get_settings_path(), "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=4)
+        except Exception:
+            pass
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
