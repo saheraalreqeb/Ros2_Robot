@@ -66,6 +66,7 @@ from gui.topic_inspector import TopicInspectorPage
 from gui.visualizer import VisualizerPage
 from gui.dds_troubleshooter import DDSTroubleshooterPage
 from gui.log_viewer import UnifiedLogViewerPage
+from gui.urdf_viewer import URDFViewerPage
 
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
@@ -136,8 +137,9 @@ _NAV_ENTRIES = [
     (7, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
     (8, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
     (9, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
-    (10, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
-    (11, "btn_settings",      "Settings",          "fa5s.cog",            None),
+    (10, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
+    (11, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
+    (12, "btn_settings",      "Settings",          "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -152,6 +154,7 @@ _TAB_KEY_FOR_BTN = {
     "btn_params":         "params",
     "btn_visualizer":     "visualizer",
     "btn_bags":           "bags",
+    "btn_urdf":           "urdf",
     "btn_tools":          "tools",
     "btn_settings":       "settings",
 }
@@ -315,8 +318,9 @@ class MainWindow(QMainWindow):
         self.parameter_manager_page = ParameterManagerPage(self.cli)  # 7
         self.visualizer_page   = VisualizerPage(self.cli)        # 8
         self.bag_manager_page  = BagManagerPage(self.cli)        # 9
-        self.tools_hub_page    = ToolsHubPage(self.cli)          # 10
-        self.settings_page     = self._create_settings_page()   # 11
+        self.urdf_page         = URDFViewerPage(self.cli)        # 10
+        self.tools_hub_page    = ToolsHubPage(self.cli)          # 11
+        self.settings_page     = self._create_settings_page()   # 12
 
         # Connect launch logs to unified log viewer
         self.launch_manager_page.log_emitted.connect(self._on_node_log_received)
@@ -332,8 +336,9 @@ class MainWindow(QMainWindow):
             self.parameter_manager_page,  # 7
             self.visualizer_page,  # 8
             self.bag_manager_page, # 9
-            self.tools_hub_page,   # 10
-            self.settings_page,    # 11
+            self.urdf_page,        # 10
+            self.tools_hub_page,   # 11
+            self.settings_page,    # 12
         ]:
             self.content_stack.addWidget(page)
 
@@ -358,7 +363,8 @@ class MainWindow(QMainWindow):
             7: self._refresh_params,
             8: self._refresh_visualizer,
             9: self._refresh_bags,
-            10: self._refresh_tools,
+            10: self._refresh_urdf,
+            11: self._refresh_tools,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
@@ -456,6 +462,10 @@ class MainWindow(QMainWindow):
             self.bag_manager_page._scan_existing_bags()
         if hasattr(self.bag_manager_page, "_refresh_topics"):
             self.bag_manager_page._refresh_topics()
+
+    def _refresh_urdf(self):
+        if hasattr(self.urdf_page, "scan_workspace"):
+            self.urdf_page.scan_workspace()
 
     # ── Settings page factory ─────────────────────────────────────────────────
 
@@ -1094,6 +1104,7 @@ class MainWindow(QMainWindow):
         pages_with_set_ws = [
             "visualizer_page", "launch_manager_page", "tools_hub_page",
             "topic_inspector_page", "parameter_manager_page", "bag_manager_page",
+            "urdf_page",
         ]
         for attr in pages_with_set_ws:
             page = getattr(self, attr, None)

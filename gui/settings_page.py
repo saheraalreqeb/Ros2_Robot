@@ -46,6 +46,7 @@ class SettingsPage(QWidget):
         ("params",         "Parameters",        False),
         ("visualizer",     "Visualizer",        False),
         ("bags",           "Bag Manager",       False),
+        ("urdf",           "URDF Viewer",       False),
         ("tools",          "Tools Hub",         False),
         ("settings",       "Settings",          True),   # always shown
     ]
