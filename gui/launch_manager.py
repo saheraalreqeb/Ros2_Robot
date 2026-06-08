@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QScrollArea, QDialog, QListWidget, QListWidgetItem, QComboBox,
     QLineEdit, QSpinBox, QMessageBox, QFormLayout, QGroupBox,
-    QSizePolicy, QAbstractItemView
+    QSizePolicy, QAbstractItemView, QTabWidget
 )
 from PySide6.QtCore import Qt, QSize, Signal
 
@@ -540,6 +540,30 @@ class LaunchBuilderDialog(QDialog):
             QPushButton:pressed {{
                 background-color: {p['bg_selected']};
             }}
+            QTabWidget::pane {{
+                border: 1px solid {p['border']};
+                border-radius: 6px;
+                background-color: {p['bg_card']};
+            }}
+            QTabBar::tab {{
+                background-color: {p['bg_card']};
+                color: {p['text_secondary']};
+                padding: 6px 12px;
+                border: 1px solid {p['border']};
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {p['bg_selected']};
+                color: {p['text_primary']};
+                border-bottom: 2px solid {p['accent']};
+            }}
+            QTabBar::tab:hover {{
+                background-color: {p['bg_hover']};
+            }}
         """)
 
     # ── UI construction ───────────────────────────────────────────────────
@@ -575,49 +599,101 @@ class LaunchBuilderDialog(QDialog):
         cols = QHBoxLayout()
         cols.setSpacing(16)
 
-        # Left: add-block controls
-        left = QVBoxLayout()
-        left.setSpacing(10)
+        # Left: tab widget for adding blocks
+        self.tab_add_blocks = QTabWidget()
+        self.tab_add_blocks.setObjectName("tabAddBlocks")
 
-        # -- Add Node block --
-        node_group = QGroupBox("Add Node Block")
-        node_lay = QFormLayout(node_group)
+        # Tab 1: Node
+        tab_node = QWidget()
+        tab_node_lay = QFormLayout(tab_node)
+        tab_node_lay.setContentsMargins(12, 12, 12, 12)
+        tab_node_lay.setSpacing(10)
 
         self.cmb_node_pkg = QComboBox()
         for pkg in self.packages:
             self.cmb_node_pkg.addItem(pkg["name"], pkg)
         self.cmb_node_pkg.currentIndexChanged.connect(self._on_node_pkg_changed)
-        node_lay.addRow("Package:", self.cmb_node_pkg)
+        tab_node_lay.addRow("Package:", self.cmb_node_pkg)
 
         self.cmb_node_exec = QComboBox()
-        self.cmb_node_exec.setEditable(True)  # allow manual entry
-        node_lay.addRow("Executable:", self.cmb_node_exec)
+        self.cmb_node_exec.setEditable(True)
+        tab_node_lay.addRow("Executable:", self.cmb_node_exec)
 
         btn_add_node = QPushButton("+ Add Node")
         btn_add_node.setObjectName("btnAddNode")
         btn_add_node.setProperty("class", "btn-success")
         btn_add_node.clicked.connect(self._add_node_block)
-        node_lay.addRow(btn_add_node)
+        tab_node_lay.addRow(btn_add_node)
 
-        left.addWidget(node_group)
+        self.tab_add_blocks.addTab(tab_node, "Node")
 
-        # -- Add Timer block --
-        timer_group = QGroupBox("Add Timer / Delay Block")
-        timer_lay = QFormLayout(timer_group)
+        # Tab 2: Delay
+        tab_timer = QWidget()
+        tab_timer_lay = QFormLayout(tab_timer)
+        tab_timer_lay.setContentsMargins(12, 12, 12, 12)
+        tab_timer_lay.setSpacing(10)
 
         self.spn_delay = QSpinBox()
         self.spn_delay.setRange(1, 300)
         self.spn_delay.setValue(3)
         self.spn_delay.setSuffix(" sec")
-        timer_lay.addRow("Delay:", self.spn_delay)
+        tab_timer_lay.addRow("Delay:", self.spn_delay)
 
         btn_add_timer = QPushButton("+ Add Delay")
         btn_add_timer.setObjectName("btnAddDelay")
         btn_add_timer.setProperty("class", "btn-warning")
         btn_add_timer.clicked.connect(self._add_timer_block)
-        timer_lay.addRow(btn_add_timer)
+        tab_timer_lay.addRow(btn_add_timer)
 
-        left.addWidget(timer_group)
+        self.tab_add_blocks.addTab(tab_timer, "Delay")
+
+        # Tab 3: Bash Script
+        tab_script = QWidget()
+        tab_script_lay = QFormLayout(tab_script)
+        tab_script_lay.setContentsMargins(12, 12, 12, 12)
+        tab_script_lay.setSpacing(10)
+
+        self.txt_script_cmd = QLineEdit()
+        self.txt_script_cmd.setObjectName("inputScriptCommand")
+        self.txt_script_cmd.setPlaceholderText("e.g. echo 'Starting...' && sleep 1")
+        tab_script_lay.addRow("Command:", self.txt_script_cmd)
+
+        btn_add_script = QPushButton("+ Add Script")
+        btn_add_script.setObjectName("btnAddScript")
+        btn_add_script.setProperty("class", "btn-success")
+        btn_add_script.clicked.connect(self._add_script_block)
+        tab_script_lay.addRow(btn_add_script)
+
+        self.tab_add_blocks.addTab(tab_script, "Bash Script")
+
+        # Tab 4: Nested Launch
+        tab_include = QWidget()
+        tab_include_lay = QFormLayout(tab_include)
+        tab_include_lay.setContentsMargins(12, 12, 12, 12)
+        tab_include_lay.setSpacing(10)
+
+        self.cmb_include_pkg = QComboBox()
+        self.cmb_include_pkg.setObjectName("cmbIncludePkg")
+        for pkg in self.packages:
+            self.cmb_include_pkg.addItem(pkg["name"], pkg)
+        self.cmb_include_pkg.currentIndexChanged.connect(self._on_include_pkg_changed)
+        tab_include_lay.addRow("Package:", self.cmb_include_pkg)
+
+        self.cmb_include_file = QComboBox()
+        self.cmb_include_file.setObjectName("cmbIncludeFile")
+        self.cmb_include_file.setEditable(True)
+        tab_include_lay.addRow("Launch File:", self.cmb_include_file)
+
+        btn_add_include = QPushButton("+ Add Include")
+        btn_add_include.setObjectName("btnAddInclude")
+        btn_add_include.setProperty("class", "btn-success")
+        btn_add_include.clicked.connect(self._add_include_block)
+        tab_include_lay.addRow(btn_add_include)
+
+        self.tab_add_blocks.addTab(tab_include, "Nested Launch")
+
+        left = QVBoxLayout()
+        left.addWidget(self.tab_add_blocks)
         left.addStretch()
         cols.addLayout(left, 1)
 
@@ -670,8 +746,9 @@ class LaunchBuilderDialog(QDialog):
 
         root.addLayout(bottom)
 
-        # Populate executables for the initial package selection
+        # Populate initial selections
         self._on_node_pkg_changed()
+        self._on_include_pkg_changed()
 
     # ── Executable combo refresh ──────────────────────────────────────────
 
@@ -681,6 +758,31 @@ class LaunchBuilderDialog(QDialog):
         if pkg_data:
             for node_name in pkg_data.get("nodes", []):
                 self.cmb_node_exec.addItem(node_name)
+
+    def _on_include_pkg_changed(self) -> None:
+        self.cmb_include_file.clear()
+        pkg_data = self.cmb_include_pkg.currentData()
+        if pkg_data:
+            pkg_path = pkg_data.get("path", "")
+            if not pkg_path:
+                return
+            launch_dir = os.path.join(pkg_path, "launch")
+            found_files = []
+            if os.path.exists(launch_dir):
+                for root, _, files in os.walk(launch_dir):
+                    for f in files:
+                        if f.endswith('.launch.py') or f.endswith('.launch.xml') or f.endswith('.launch.yaml'):
+                            rel = os.path.relpath(os.path.join(root, f), launch_dir)
+                            found_files.append(rel.replace('\\', '/'))
+            else:
+                for root, _, files in os.walk(pkg_path):
+                    for f in files:
+                        if f.endswith('.launch.py') or f.endswith('.launch.xml') or f.endswith('.launch.yaml'):
+                            rel = os.path.relpath(os.path.join(root, f), pkg_path)
+                            found_files.append(rel.replace('\\', '/'))
+            
+            for f in sorted(list(set(found_files))):
+                self.cmb_include_file.addItem(f)
 
     # ── Block manipulation ────────────────────────────────────────────────
 
@@ -696,6 +798,34 @@ class LaunchBuilderDialog(QDialog):
         self.blocks.append(block)
 
         item = QListWidgetItem(f"🟢  Node  ▸  {pkg_name} / {exe_name}")
+        self.lst_blocks.addItem(item)
+
+    def _add_script_block(self) -> None:
+        cmd_text = self.txt_script_cmd.text().strip()
+        if not cmd_text:
+            QMessageBox.warning(self, "Missing Command",
+                                "Please enter a shell command or script to execute.")
+            return
+
+        block = {"type": "script", "command": cmd_text}
+        self.blocks.append(block)
+
+        item = QListWidgetItem(f"🐚  Script  ▸  {cmd_text}")
+        self.lst_blocks.addItem(item)
+        self.txt_script_cmd.clear()
+
+    def _add_include_block(self) -> None:
+        pkg_name = self.cmb_include_pkg.currentText()
+        launch_file = self.cmb_include_file.currentText().strip()
+        if not launch_file:
+            QMessageBox.warning(self, "Missing Launch File",
+                                "Please select or enter a launch file name to include.")
+            return
+
+        block = {"type": "include", "package": pkg_name, "launch_file": launch_file}
+        self.blocks.append(block)
+
+        item = QListWidgetItem(f"🚀  Include  ▸  {pkg_name} / {launch_file}")
         self.lst_blocks.addItem(item)
 
     def _add_timer_block(self) -> None:
@@ -798,16 +928,36 @@ class LaunchBuilderDialog(QDialog):
           - launch.LaunchDescription
           - launch_ros.actions.Node
           - launch.actions.TimerAction  (for delays)
+          - launch.actions.ExecuteProcess (for script blocks)
+          - launch.actions.IncludeLaunchDescription (for nested launches)
         """
         # Determine which imports we need
         has_nodes  = any(b["type"] == "node"  for b in blocks)
         has_timers = any(b["type"] == "timer" for b in blocks)
+        has_scripts = any(b["type"] == "script" for b in blocks)
+        has_includes = any(b["type"] == "include" for b in blocks)
+
+        has_xml_includes = any(b["type"] == "include" and b["launch_file"].endswith(".xml") for b in blocks)
+        has_yaml_includes = any(b["type"] == "include" and b["launch_file"].endswith(".yaml") for b in blocks)
+        has_py_includes = any(b["type"] == "include" and not (b["launch_file"].endswith(".xml") or b["launch_file"].endswith(".yaml")) for b in blocks)
 
         lines: List[str] = [
             "from launch import LaunchDescription",
         ]
         if has_timers:
             lines.append("from launch.actions import TimerAction")
+        if has_scripts:
+            lines.append("from launch.actions import ExecuteProcess")
+        if has_includes:
+            lines.append("from launch.actions import IncludeLaunchDescription")
+            lines.append("from launch.substitutions import PathJoinSubstitution")
+            lines.append("from launch_ros.substitutions import FindPackageShare")
+            if has_py_includes:
+                lines.append("from launch.launch_description_sources import PythonLaunchDescriptionSource")
+            if has_xml_includes:
+                lines.append("from launch_xml.launch_description_sources import XmlLaunchDescriptionSource")
+            if has_yaml_includes:
+                lines.append("from launch_yaml.launch_description_sources import YamlLaunchDescriptionSource")
         if has_nodes:
             lines.append("from launch_ros.actions import Node")
 
@@ -818,7 +968,7 @@ class LaunchBuilderDialog(QDialog):
         lines.append("")
 
         # We collect top-level actions in a flat list.  When we hit a
-        # Timer block, every subsequent Node (until the next timer or
+        # Timer block, every subsequent action (until the next timer or
         # end) is wrapped inside a TimerAction.
         #
         # Strategy:  walk blocks and split into "segments" separated by
@@ -851,28 +1001,61 @@ class LaunchBuilderDialog(QDialog):
             if not seg["nodes"]:
                 continue
 
-            # Build Node(...) snippets
-            node_snippets: List[str] = []
+            # Build action snippets
+            action_snippets: List[str] = []
             for nd in seg["nodes"]:
-                snippet = (
-                    f"Node(\n"
-                    f"            package='{nd['package']}',\n"
-                    f"            executable='{nd['executable']}',\n"
-                    f"            output='screen',\n"
-                    f"        )"
-                )
-                node_snippets.append(snippet)
+                if nd["type"] == "node":
+                    snippet = (
+                        f"Node(\n"
+                        f"            package='{nd['package']}',\n"
+                        f"            executable='{nd['executable']}',\n"
+                        f"            output='screen',\n"
+                        f"        )"
+                    )
+                elif nd["type"] == "script":
+                    cmd_escaped = nd["command"].replace("'", "\\'")
+                    snippet = (
+                        f"ExecuteProcess(\n"
+                        f"            cmd=['bash', '-c', '{cmd_escaped}'],\n"
+                        f"            output='screen',\n"
+                        f"        )"
+                    )
+                elif nd["type"] == "include":
+                    filename = nd["launch_file"]
+                    if filename.endswith(".xml"):
+                        src_type = "XmlLaunchDescriptionSource"
+                    elif filename.endswith(".yaml"):
+                        src_type = "YamlLaunchDescriptionSource"
+                    else:
+                        src_type = "PythonLaunchDescriptionSource"
+                    snippet = (
+                        f"IncludeLaunchDescription(\n"
+                        f"            {src_type}(\n"
+                        f"                PathJoinSubstitution([\n"
+                        f"                    FindPackageShare('{nd['package']}'),\n"
+                        f"                    'launch',\n"
+                        f"                    '{filename}'\n"
+                        f"                ])\n"
+                        f"            )\n"
+                        f"        )"
+                    )
+                else:
+                    continue
+                action_snippets.append(snippet)
+
+            if not action_snippets:
+                continue
 
             if cumulative_delay == 0.0:
                 # Direct actions (no delay wrapping)
-                for snip in node_snippets:
+                for snip in action_snippets:
                     lines.append(f"    actions.append(\n        {snip}\n    )")
                     lines.append("")
             else:
                 # Wrap in TimerAction
                 inner = ",\n            ".join(
-                    # Re-indent the Node snippets for inside the list
-                    s.replace("\n", "\n        ") for s in node_snippets
+                    # Re-indent the snippets for inside the list
+                    s.replace("\n", "\n        ") for s in action_snippets
                 )
                 lines.append(
                     f"    actions.append(\n"

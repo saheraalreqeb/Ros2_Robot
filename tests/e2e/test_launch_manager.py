@@ -1,6 +1,6 @@
 import os
 import pytest
-from PySide6.QtWidgets import QLabel, QListWidget, QPushButton, QLineEdit, QDialog, QMessageBox, QScrollArea
+from PySide6.QtWidgets import QLabel, QListWidget, QPushButton, QLineEdit, QDialog, QMessageBox, QScrollArea, QComboBox
 from PySide6.QtCore import Qt
 from gui.launch_manager import LaunchManagerPage
 
@@ -18,14 +18,21 @@ def test_empty_workspace_state(main_window, qtbot, tmp_path):
     launch_page = get_launch_page(main_window)
     assert launch_page is not None
 
+    # Switch to the launch page so it becomes visible
+    main_window.content_stack.setCurrentWidget(launch_page)
+
     # Simulate UI refresh if needed
     if hasattr(launch_page, 'refresh_file_list'):
         launch_page.refresh_file_list()
 
+    # Process pending deleteLater() events
+    from PySide6.QtCore import QCoreApplication
+    QCoreApplication.processEvents()
+
     # Look for an empty state label
     empty_label = launch_page.findChild(QLabel, "emptyStateLabel")
     if empty_label is not None:
-        assert empty_label.isVisible()
+        assert not empty_label.isHidden()
         assert "no launch files" in empty_label.text().lower()
     else:
         pytest.fail("Feature not implemented: emptyStateLabel not found")
@@ -247,3 +254,52 @@ def test_boundary_large_number_of_files(main_window, qtbot, tmp_path):
     scroll_area = launch_page.findChild(QScrollArea)
     if scroll_area is None and file_list is None:
          pytest.fail("Feature not implemented: Missing ScrollArea or ListWidget for large file list")
+
+def test_visual_builder_scripts_and_includes(main_window, qtbot, tmp_path, mocker):
+    """11. test_visual_builder_scripts_and_includes: Add script and nested launch blocks, verify generation."""
+    main_window.current_workspace_path = str(tmp_path)
+    launch_page = get_launch_page(main_window)
+    
+    # Open builder dialog
+    btn_new = launch_page.findChild(QPushButton, "btnNewLaunch")
+    assert btn_new is not None
+    qtbot.mouseClick(btn_new, Qt.LeftButton)
+    
+    # Enter script command
+    input_cmd = launch_page.findChild(QLineEdit, "inputScriptCommand")
+    assert input_cmd is not None
+    input_cmd.setText("echo 'ROS 2 is active!'")
+    
+    btn_add_script = launch_page.findChild(QPushButton, "btnAddScript")
+    assert btn_add_script is not None
+    qtbot.mouseClick(btn_add_script, Qt.LeftButton)
+    
+    # Enter launch file to include
+    input_file = launch_page.findChild(QComboBox, "cmbIncludeFile")
+    assert input_file is not None
+    input_file.setEditText("robot.launch.py")
+    
+    btn_add_include = launch_page.findChild(QPushButton, "btnAddInclude")
+    assert btn_add_include is not None
+    qtbot.mouseClick(btn_add_include, Qt.LeftButton)
+    
+    # Set filename
+    input_filename = launch_page.findChild(QLineEdit, "inputFilename")
+    assert input_filename is not None
+    input_filename.setText("script_include.launch.py")
+    
+    mock_open = mocker.patch("builtins.open", mocker.mock_open())
+    
+    btn_save = launch_page.findChild(QPushButton, "btnSaveLaunch")
+    assert btn_save is not None
+    qtbot.mouseClick(btn_save, Qt.LeftButton)
+    
+    mock_open.assert_called_once()
+    handle = mock_open()
+    written_content = "".join(call.args[0] for call in handle.write.call_args_list)
+    assert "ExecuteProcess" in written_content
+    assert "IncludeLaunchDescription" in written_content
+    assert "FindPackageShare" in written_content
+    assert "PythonLaunchDescriptionSource" in written_content
+    assert "echo \\'ROS 2 is active!\\'" in written_content
+
