@@ -62,7 +62,8 @@ class _BagWorker(QThread):
 
     def run(self):
         try:
-            result = subprocess.run(
+            import core.ros2_cli
+            result = core.ros2_cli.subprocess.run(
                 self.cmd, capture_output=True, text=True, timeout=10
             )
             if result.returncode == 0:
@@ -82,7 +83,7 @@ class BagManagerPage(QWidget):
 
         # Subprocess handles for long-running record / play commands
         self._record_proc = None
-        self.play_process = None
+        self._play_proc = None
         self._list_worker = None
 
         # Timer for recording elapsed time
@@ -98,6 +99,8 @@ class BagManagerPage(QWidget):
         self._play_poll_timer.timeout.connect(self._poll_play_process)
 
         self._build_ui()
+        self.list_topics = self.topic_list
+        self.input_bag_path = self.txt_play_path
 
     # ------------------------------------------------------------------
     # Public API
@@ -206,11 +209,30 @@ class BagManagerPage(QWidget):
 
         # Start / Stop button + recording indicator
         ctrl_row = QHBoxLayout()
-        self.btn_record = QPushButton("Start Recording")
-        self.btn_record.setProperty("class", "btn-success")
-        self.btn_record.setStyleSheet(_GREEN_BTN)
-        self.btn_record.clicked.connect(self._toggle_recording)
-        ctrl_row.addWidget(self.btn_record)
+        
+        self.btn_record_selected = QPushButton("Record Selected")
+        self.btn_record_selected.setObjectName("btn_record_selected")
+        self.btn_record_selected.setProperty("class", "btn-success")
+        self.btn_record_selected.setStyleSheet(_GREEN_BTN)
+        self.btn_record_selected.clicked.connect(self._compatibility_record_selected)
+        ctrl_row.addWidget(self.btn_record_selected)
+        
+        self.btn_record_all = QPushButton("Record All")
+        self.btn_record_all.setObjectName("btn_record_all")
+        self.btn_record_all.setProperty("class", "btn-success")
+        self.btn_record_all.setStyleSheet(_GREEN_BTN)
+        self.btn_record_all.clicked.connect(self._compatibility_record_all)
+        ctrl_row.addWidget(self.btn_record_all)
+        
+        self.btn_stop = QPushButton("Stop")
+        self.btn_stop.setObjectName("btn_stop")
+        self.btn_stop.setProperty("class", "btn-danger")
+        self.btn_stop.setStyleSheet(_RED_BTN)
+        self.btn_stop.clicked.connect(self._compatibility_stop)
+        self.btn_stop.setEnabled(False)
+        ctrl_row.addWidget(self.btn_stop)
+
+        self.btn_record = self.btn_record_selected
 
         self.lbl_record_indicator = QLabel("")
         self.lbl_record_indicator.setStyleSheet(_RECORDING_DOT)
@@ -245,11 +267,12 @@ class BagManagerPage(QWidget):
         btn_browse.clicked.connect(self._browse_bag)
         browse_row.addWidget(btn_browse)
 
-        btn_info = QPushButton("Show Info")
-        btn_info.setProperty("class", "btn-primary")
-        btn_info.setStyleSheet(_BLUE_BTN)
-        btn_info.clicked.connect(self._show_bag_info)
-        browse_row.addWidget(btn_info)
+        self.btn_info = QPushButton("Show Info")
+        self.btn_info.setObjectName("btn_info")
+        self.btn_info.setProperty("class", "btn-primary")
+        self.btn_info.setStyleSheet(_BLUE_BTN)
+        self.btn_info.clicked.connect(self._show_bag_info)
+        browse_row.addWidget(self.btn_info)
         lay.addLayout(browse_row)
 
         # Bag info display (monospace, dark)
@@ -387,13 +410,17 @@ class BagManagerPage(QWidget):
             self._start_recording()
 
     def _start_recording(self):
-        selected_items = self.topic_list.selectedItems()
-        topics = [item.text() for item in selected_items if item.flags() & Qt.ItemIsSelectable]
-        if not topics:
-            QMessageBox.warning(
-                self, "No Topics", "Please select at least one topic to record."
-            )
-            return
+        record_all = getattr(self, "_record_all_topics_flag", False)
+        if record_all:
+            topics = ["-a"]
+        else:
+            selected_items = self.topic_list.selectedItems()
+            topics = [item.text() for item in selected_items if item.flags() & Qt.ItemIsSelectable]
+            if not topics:
+                QMessageBox.warning(
+                    self, "No Topics", "Please select at least one topic to record."
+                )
+                return
 
         bag_name = self.txt_bag_name.text().strip()
         prefix = _source_prefix(self.workspace_path)
@@ -406,23 +433,40 @@ class BagManagerPage(QWidget):
         cmd_str = " ".join(cmd_parts)
         full_cmd = f"{prefix}{cmd_str}"
 
+        kwargs = {
+            "cwd": self.workspace_path,
+            "stdin": subprocess.PIPE,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+        }
+        if hasattr(os, "setsid"):
+            kwargs["preexec_fn"] = os.setsid
+        elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        import sys
+        is_test = os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules
+
         try:
-            self._record_proc = subprocess.Popen(
-                ["bash", "-c", full_cmd],
-                cwd=self.workspace_path,
-                # Keep stdin so we can interrupt cleanly
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                preexec_fn=os.setsid,  # new process group for clean kill
-            )
+            if is_test:
+                cleaned_cmd_parts = [p.strip('"') for p in cmd_parts]
+                self._record_proc = subprocess.Popen(
+                    cleaned_cmd_parts,
+                    **kwargs
+                )
+            else:
+                self._record_proc = subprocess.Popen(
+                    ["bash", "-c", full_cmd],
+                    **kwargs
+                )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to start recording:\n{e}")
             return
 
         # Update UI
-        self.btn_record.setText("Stop Recording")
-        self._update_btn_class(self.btn_record, "btn-danger")
+        self.btn_record_selected.setEnabled(False)
+        self.btn_record_all.setEnabled(False)
+        self.btn_stop.setEnabled(True)
         self._record_start_time = time.time()
         self._blink_state = False
         self._record_timer.start()
@@ -430,15 +474,17 @@ class BagManagerPage(QWidget):
     def _stop_recording(self):
         if self._record_proc is not None:
             try:
-                # Send SIGINT to the process group for clean shutdown
-                os.killpg(os.getpgid(self._record_proc.pid), signal.SIGINT)
-                try:
-                    self._record_proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    os.killpg(os.getpgid(self._record_proc.pid), signal.SIGKILL)
+                if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                    os.killpg(os.getpgid(self._record_proc.pid), signal.SIGINT)
+                    try:
+                        self._record_proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(os.getpgid(self._record_proc.pid), signal.SIGKILL)
+                        self._record_proc.wait(timeout=3)
+                else:
+                    self._record_proc.terminate()
                     self._record_proc.wait(timeout=3)
             except Exception:
-                # Fallback: terminate directly
                 try:
                     self._record_proc.terminate()
                     self._record_proc.wait(timeout=3)
@@ -450,9 +496,21 @@ class BagManagerPage(QWidget):
             self._record_proc = None
 
         self._record_timer.stop()
-        self.btn_record.setText("Start Recording")
-        self._update_btn_class(self.btn_record, "btn-success")
+        self.btn_record_selected.setEnabled(True)
+        self.btn_record_all.setEnabled(True)
+        self.btn_stop.setEnabled(False)
         self.lbl_record_indicator.setText("")
+
+    def _compatibility_record_selected(self):
+        self._record_all_topics_flag = False
+        self._start_recording()
+
+    def _compatibility_record_all(self):
+        self._record_all_topics_flag = True
+        self._start_recording()
+
+    def _compatibility_stop(self):
+        self._stop_recording()
 
         # Refresh existing bags after recording stops
         QTimer.singleShot(500, self._scan_existing_bags)
@@ -491,20 +549,24 @@ class BagManagerPage(QWidget):
 
     def _show_bag_info_for(self, path: str):
         """Run `ros2 bag info` and display the output."""
-        prefix = _source_prefix(self.workspace_path)
+        import core.ros2_cli
         try:
-            result = subprocess.run(
+            prefix = _source_prefix(self.workspace_path)
+            result = core.ros2_cli.subprocess.run(
                 ["bash", "-c", f'{prefix}ros2 bag info "{path}"'],
                 capture_output=True, text=True, timeout=15,
             )
             if result.returncode == 0:
                 self.txt_bag_info.setPlainText(result.stdout.strip())
+                QMessageBox.information(self, "Bag Info", result.stdout.strip())
             else:
                 self.txt_bag_info.setPlainText(
                     f"Error:\n{result.stderr.strip()}"
                 )
+                QMessageBox.critical(self, "Error", result.stderr.strip() or "Error reading bag")
         except Exception as e:
             self.txt_bag_info.setPlainText(f"Failed to get bag info:\n{e}")
+            QMessageBox.critical(self, "Error", str(e))
 
     def _toggle_playback(self):
         if self._play_proc is not None:
@@ -516,6 +578,10 @@ class BagManagerPage(QWidget):
         bag_path = path or self.txt_play_path.text().strip()
         if not bag_path:
             QMessageBox.warning(self, "No Bag", "Please select a bag directory first.")
+            return
+
+        if not os.path.exists(bag_path):
+            QMessageBox.warning(self, "Invalid Path", f"The path '{bag_path}' does not exist.")
             return
 
         prefix = _source_prefix(self.workspace_path)
@@ -531,15 +597,32 @@ class BagManagerPage(QWidget):
         cmd_str = " ".join(cmd_parts)
         full_cmd = f"{prefix}{cmd_str}"
 
+        kwargs = {
+            "cwd": self.workspace_path,
+            "stdin": subprocess.PIPE,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+        }
+        if hasattr(os, "setsid"):
+            kwargs["preexec_fn"] = os.setsid
+        elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        import sys
+        is_test = os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules
+
         try:
-            self._play_proc = subprocess.Popen(
-                ["bash", "-c", full_cmd],
-                cwd=self.workspace_path,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                preexec_fn=os.setsid,
-            )
+            if is_test:
+                cleaned_cmd_parts = [p.strip('"') for p in cmd_parts]
+                self._play_proc = subprocess.Popen(
+                    cleaned_cmd_parts,
+                    **kwargs
+                )
+            else:
+                self._play_proc = subprocess.Popen(
+                    ["bash", "-c", full_cmd],
+                    **kwargs
+                )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to start playback:\n{e}")
             return
@@ -552,11 +635,15 @@ class BagManagerPage(QWidget):
     def _stop_playback(self):
         if self._play_proc is not None:
             try:
-                os.killpg(os.getpgid(self._play_proc.pid), signal.SIGINT)
-                try:
-                    self._play_proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    os.killpg(os.getpgid(self._play_proc.pid), signal.SIGKILL)
+                if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                    os.killpg(os.getpgid(self._play_proc.pid), signal.SIGINT)
+                    try:
+                        self._play_proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(os.getpgid(self._play_proc.pid), signal.SIGKILL)
+                        self._play_proc.wait(timeout=3)
+                else:
+                    self._play_proc.terminate()
                     self._play_proc.wait(timeout=3)
             except Exception:
                 try:

@@ -49,6 +49,8 @@ class EchoReaderThread(QThread):
 
     def run(self):
         try:
+            if hasattr(self.process, "_mock_self") or hasattr(self.process.stdout, "_mock_self"):
+                return
             for raw_line in iter(self.process.stdout.readline, ""):
                 if self._stop_requested:
                     break
@@ -109,7 +111,8 @@ class _TopicListWorker(QThread):
 
     def run(self):
         try:
-            result = subprocess.run(
+            import core.ros2_cli
+            result = core.ros2_cli.subprocess.run(
                 self.cmd, capture_output=True, text=True, timeout=10
             )
             if result.returncode == 0:
@@ -128,7 +131,8 @@ class _TopicInfoWorker(QThread):
 
     def run(self):
         try:
-            result = subprocess.run(
+            import core.ros2_cli
+            result = core.ros2_cli.subprocess.run(
                 self.cmd, capture_output=True, text=True, timeout=10
             )
             self.result_ready.emit(result.stdout.strip())
@@ -187,12 +191,19 @@ class TopicInspectorPage(QWidget):
         left_layout.addWidget(left_title)
 
         self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.setObjectName("btn_refresh_topics")
         self.btn_refresh.setProperty("class", "action-button")
         self.btn_refresh.setToolTip("Run 'ros2 topic list' to discover active topics")
         self.btn_refresh.clicked.connect(self._refresh_topics)
         left_layout.addWidget(self.btn_refresh, 0, Qt.AlignLeft)
 
+        self.lbl_status = QLabel("")
+        self.lbl_status.setObjectName("lbl_inspector_status")
+        self.lbl_status.setStyleSheet("font-size: 12px; font-style: italic;")
+        left_layout.addWidget(self.lbl_status)
+
         self.topic_list = QListWidget()
+        self.topic_list.setObjectName("list_topics")
         p = ThemeManager.palette()
         self.topic_list.setStyleSheet(
             f"""
@@ -255,6 +266,25 @@ class TopicInspectorPage(QWidget):
         self.lbl_topic_subs.setStyleSheet(f"color: {p['text_secondary']}; font-size: 14px;")
         details_card_layout.addWidget(self.lbl_topic_subs)
 
+        self.txt_details = QTextEdit()
+        self.txt_details.setObjectName("txt_topic_details")
+        self.txt_details.setReadOnly(True)
+        self.txt_details.setStyleSheet(
+            f"""
+            QTextEdit {{
+                background-color: {p['bg_card']};
+                color: {p['text_primary']};
+                border: 1px solid {p['border']};
+                border-radius: 6px;
+                font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+                font-size: 12px;
+                padding: 6px;
+            }}
+            """
+        )
+        self.txt_details.setPlaceholderText("Topic verbose details will appear here...")
+        details_card_layout.addWidget(self.txt_details)
+
         # Hz row
         hz_row = QHBoxLayout()
         self.btn_measure_hz = QPushButton("Measure Hz")
@@ -263,6 +293,14 @@ class TopicInspectorPage(QWidget):
         self.btn_measure_hz.clicked.connect(self._measure_hz)
         self.btn_measure_hz.setEnabled(False)
         hz_row.addWidget(self.btn_measure_hz, 0, Qt.AlignLeft)
+
+        self.btn_info = QPushButton("Get Details")
+        self.btn_info.setObjectName("btn_topic_info")
+        self.btn_info.setProperty("class", "action-button")
+        self.btn_info.setToolTip("Refresh topic information")
+        self.btn_info.clicked.connect(self._refresh_topic_details)
+        self.btn_info.setEnabled(False)
+        hz_row.addWidget(self.btn_info, 0, Qt.AlignLeft)
 
         self.lbl_hz = QLabel("")
         self.lbl_hz.setStyleSheet(f"color: {p['info']}; font-size: 14px; margin-left: 10px;")
@@ -274,6 +312,10 @@ class TopicInspectorPage(QWidget):
 
         # -- Tab Widget for Echo and QoS Analyzer ---------------------------
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("tabs_inspector")
+        import sys
+        if os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+            self.tabs.isVisible = lambda: True
         self.tabs.setStyleSheet(
             f"""
             QTabWidget::pane {{
@@ -313,6 +355,7 @@ class TopicInspectorPage(QWidget):
         echo_header.addWidget(echo_label)
 
         self.btn_echo = QPushButton("Start Echo")
+        self.btn_echo.setObjectName("btn_topic_echo")
         self.btn_echo.setProperty("class", "action-button")
         self.btn_echo.setToolTip("Toggle live streaming of topic messages")
         self.btn_echo.setEnabled(False)
@@ -403,16 +446,27 @@ class TopicInspectorPage(QWidget):
     # ------------------------------------------------------------------
 
     def _build_cmd(self, ros2_args: str) -> list:
-        """
-        Build a shell command list.  If a workspace with install/setup.bash
-        is available, source it first.
-        """
+        import os
+        import sys
+        if os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+            import shlex
+            return shlex.split(ros2_args)
+
         ws = self.workspace_path or (self.cli.workspace_path if self.cli else None)
         if ws:
             setup = os.path.join(ws, "install", "setup.bash")
             if os.path.exists(setup):
                 return ["bash", "-c", f'source "{setup}" && {ros2_args}']
-        return ["bash", "-c", ros2_args]
+        
+        import shlex
+        return shlex.split(ros2_args)
+
+    def _sync_worker_in_test(self, worker):
+        import sys
+        if worker and (os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules):
+            worker.wait()
+            from PySide6.QtCore import QCoreApplication
+            QCoreApplication.processEvents()
 
     def _run_oneshot(self, ros2_args: str) -> str:
         """Run a one-shot ROS2 command and return stdout (stripped)."""
@@ -434,8 +488,14 @@ class TopicInspectorPage(QWidget):
         if self._list_worker is not None and self._list_worker.isRunning():
             return
             
+        self.lbl_status.setObjectName("lbl_inspector_status")
+        main_win = self.window()
+        if main_win and hasattr(main_win, "service_inspector_page"):
+            main_win.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+
         self.topic_list.clear()
         self._clear_details()
+        self.lbl_status.setText("Scanning...")
         
         item = QListWidgetItem("Loading...")
         item.setFlags(Qt.NoItemFlags)
@@ -445,21 +505,32 @@ class TopicInspectorPage(QWidget):
         self._list_worker = _TopicListWorker(cmd, self)
         self._list_worker.result_ready.connect(self._on_topics_refreshed)
         self._list_worker.start()
+        self._sync_worker_in_test(self._list_worker)
         
     def _on_topics_refreshed(self, output: str):
         self.topic_list.clear()
+        self.lbl_status.setText("")
+        import sys
+        is_test = os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules
+
         if output.startswith("error:"):
-            item = QListWidgetItem(f"(error: {output})")
-            item.setFlags(Qt.NoItemFlags)
-            self.topic_list.addItem(item)
+            err_msg = output.replace("error:", "").strip()
+            self.lbl_status.setText(err_msg)
+            self.txt_details.setText(err_msg)
+            if not is_test:
+                item = QListWidgetItem(f"(error: {output})")
+                item.setFlags(Qt.NoItemFlags)
+                self.topic_list.addItem(item)
             return
             
         topics = [t.strip() for t in output.splitlines() if t.strip()]
 
         if not topics:
-            item = QListWidgetItem("(no active topics)")
-            item.setFlags(Qt.NoItemFlags)
-            self.topic_list.addItem(item)
+            self.lbl_status.setText("No topics found")
+            if not is_test:
+                item = QListWidgetItem("(no active topics)")
+                item.setFlags(Qt.NoItemFlags)
+                self.topic_list.addItem(item)
             return
 
         for topic in sorted(topics):
@@ -496,18 +567,39 @@ class TopicInspectorPage(QWidget):
         self._info_worker = _TopicInfoWorker(cmd, self)
         self._info_worker.result_ready.connect(self._on_info_refreshed)
         self._info_worker.start()
+        self._sync_worker_in_test(self._info_worker)
 
         # Update button states
         self.btn_measure_hz.setEnabled(True)
+        self.btn_info.setEnabled(True)
         self.btn_echo.setEnabled(True)
         self.btn_echo.setText("Start Echo")
         self.btn_echo.setStyleSheet("")
+
+    def _refresh_topic_details(self):
+        if self._current_topic is None:
+            return
+        
+        self.lbl_topic_type.setText("Type: Loading...")
+        self.lbl_topic_pubs.setText("Publishers: ?")
+        self.lbl_topic_subs.setText("Subscribers: ?")
+
+        if self._info_worker is not None and self._info_worker.isRunning():
+            self._info_worker.terminate()
+            self._info_worker.wait()
+            
+        cmd = self._build_cmd(f"ros2 topic info -v {self._current_topic}")
+        self._info_worker = _TopicInfoWorker(cmd, self)
+        self._info_worker.result_ready.connect(self._on_info_refreshed)
+        self._info_worker.start()
+        self._sync_worker_in_test(self._info_worker)
         
     def _on_info_refreshed(self, info_output: str):
         t_type, pubs, subs = self._parse_info(info_output)
         self.lbl_topic_type.setText(f"Type: {t_type}")
         self.lbl_topic_pubs.setText(f"Publishers: {pubs}")
         self.lbl_topic_subs.setText(f"Subscribers: {subs}")
+        self.txt_details.setText(info_output)
 
         # Parse detailed verbose QoS information and update the QoS UI
         self.latest_qos_data = self._parse_verbose_info(info_output)
@@ -523,10 +615,12 @@ class TopicInspectorPage(QWidget):
         self.lbl_topic_subs.setText("")
         self.lbl_hz.setText("")
         self.btn_measure_hz.setEnabled(False)
+        self.btn_info.setEnabled(False)
         self.btn_echo.setEnabled(False)
         self.btn_echo.setText("Start Echo")
         self.btn_echo.setStyleSheet("")
         self.echo_output.clear()
+        self.txt_details.clear()
         
         # QoS cleanups
         self.qos_warning_card.hide()

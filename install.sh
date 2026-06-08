@@ -12,8 +12,25 @@
 
 set -e
 
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-REPO_DIR="$(dirname "$SCRIPT_PATH")"
+# Detect if we are running from a local checkout or via curl/wget
+if [ -f "requirements.txt" ] && [ -f "main.py" ]; then
+    REPO_DIR="$(pwd)"
+elif [ -f "$(dirname "${BASH_SOURCE[0]}")/requirements.txt" ] 2>/dev/null; then
+    REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    # We are running via curl/wget online. We need to clone the repo first.
+    INSTALL_DIR="$HOME/Ros2_Robot"
+    echo "➡  Running online installer..."
+    echo "➡  Cloning Ros2_Robot repository to $INSTALL_DIR..."
+    if ! command -v git &> /dev/null; then
+        echo "❌  git is not installed. Installing git (requires sudo)..."
+        sudo apt-get update -q && sudo apt-get install -y -q git
+    fi
+    rm -rf "$INSTALL_DIR"
+    git clone https://github.com/saher-m/Ros2_Robot.git "$INSTALL_DIR"
+    REPO_DIR="$INSTALL_DIR"
+fi
+
 BIN_SRC="$REPO_DIR/ros2_robot_bin"
 LOCAL_BIN="$HOME/.local/bin"
 LINK="$LOCAL_BIN/ros2_robot"

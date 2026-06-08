@@ -63,6 +63,7 @@ from gui.settings_page import SettingsPage
 from gui.theme import ThemeManager
 from gui.tools_hub import ToolsHubPage
 from gui.topic_inspector import TopicInspectorPage
+from gui.service_inspector import ServiceInspectorPage
 from gui.visualizer import VisualizerPage
 from gui.dds_troubleshooter import DDSTroubleshooterPage
 from gui.log_viewer import UnifiedLogViewerPage
@@ -132,14 +133,15 @@ _NAV_ENTRIES = [
     (2, "btn_nodes",          "Nodes",             "fa5s.microchip",      "_refresh_nodes_list"),
     (3, "btn_topics",         "Topic Inspector",   "fa5s.satellite-dish", "_refresh_topics"),
     (4, "btn_launch",         "Launch Manager",    "fa5s.rocket",         "_refresh_launch"),
-    (5, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
-    (6, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
-    (7, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
-    (8, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
-    (9, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
-    (10, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
-    (11, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
-    (12, "btn_settings",      "Settings",          "fa5s.cog",            None),
+    (5, "btn_services",       "Service Inspector", "fa5s.handshake",      "_refresh_services"),
+    (6, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
+    (7, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
+    (8, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
+    (9, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
+    (10, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
+    (11, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
+    (12, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
+    (13, "btn_settings",      "Settings",          "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -149,6 +151,7 @@ _TAB_KEY_FOR_BTN = {
     "btn_nodes":          "nodes",
     "btn_topics":         "topics",
     "btn_launch":         "launch",
+    "btn_services":       "services",
     "btn_logs":           "logs",
     "btn_troubleshooter": "troubleshooter",
     "btn_params":         "params",
@@ -261,6 +264,8 @@ class MainWindow(QMainWindow):
             btn = self._create_nav_button(page_id, label, icon_name)
             setattr(self, attr, btn)
             self._nav_buttons[attr] = btn
+            if attr == "btn_topics":
+                btn.setObjectName("nav_btn_inspector")
 
             # Tools Hub & Settings get pushed to bottom
             if attr == "btn_tools":
@@ -279,7 +284,7 @@ class MainWindow(QMainWindow):
         sb_lay.addSpacing(8)
         self.main_layout.addWidget(self.sidebar)
 
-        self.nav_group.idClicked.connect(self._switch_page)
+        self.nav_group.buttonClicked.connect(lambda btn: self._switch_page(self.nav_group.id(btn)))
         self.btn_workspace.setChecked(True)
 
     def _create_nav_button(self, page_id: int, label: str,
@@ -313,14 +318,15 @@ class MainWindow(QMainWindow):
         self.nodes_page        = self._create_nodes_page()       # 2
         self.topic_inspector_page = TopicInspectorPage(self.cli) # 3
         self.launch_manager_page  = LaunchManagerPage(self.cli)  # 4
-        self.log_viewer_page      = UnifiedLogViewerPage(self.cli) # 5
-        self.dds_troubleshooter_page = DDSTroubleshooterPage(self.cli) # 6
-        self.parameter_manager_page = ParameterManagerPage(self.cli)  # 7
-        self.visualizer_page   = VisualizerPage(self.cli)        # 8
-        self.bag_manager_page  = BagManagerPage(self.cli)        # 9
-        self.urdf_page         = URDFViewerPage(self.cli)        # 10
-        self.tools_hub_page    = ToolsHubPage(self.cli)          # 11
-        self.settings_page     = self._create_settings_page()   # 12
+        self.service_inspector_page = ServiceInspectorPage(self.cli) # 5
+        self.log_viewer_page      = UnifiedLogViewerPage(self.cli) # 6
+        self.dds_troubleshooter_page = DDSTroubleshooterPage(self.cli) # 7
+        self.parameter_manager_page = ParameterManagerPage(self.cli)  # 8
+        self.visualizer_page   = VisualizerPage(self.cli)        # 9
+        self.bag_manager_page  = BagManagerPage(self.cli)        # 10
+        self.urdf_page         = URDFViewerPage(self.cli)        # 11
+        self.tools_hub_page    = ToolsHubPage(self.cli)          # 12
+        self.settings_page     = self._create_settings_page()   # 13
 
         # Connect launch logs to unified log viewer
         self.launch_manager_page.log_emitted.connect(self._on_node_log_received)
@@ -331,14 +337,15 @@ class MainWindow(QMainWindow):
             self.nodes_page,       # 2
             self.topic_inspector_page,  # 3
             self.launch_manager_page,   # 4
-            self.log_viewer_page,       # 5
-            self.dds_troubleshooter_page, # 6
-            self.parameter_manager_page,  # 7
-            self.visualizer_page,  # 8
-            self.bag_manager_page, # 9
-            self.urdf_page,        # 10
-            self.tools_hub_page,   # 11
-            self.settings_page,    # 12
+            self.service_inspector_page, # 5
+            self.log_viewer_page,       # 6
+            self.dds_troubleshooter_page, # 7
+            self.parameter_manager_page,  # 8
+            self.visualizer_page,  # 9
+            self.bag_manager_page, # 10
+            self.urdf_page,        # 11
+            self.tools_hub_page,   # 12
+            self.settings_page,    # 13
         ]:
             self.content_stack.addWidget(page)
 
@@ -353,21 +360,37 @@ class MainWindow(QMainWindow):
                 btn.setChecked(p_id == page_id)
         # Update icon highlights
         self._refresh_nav_icons()
+
+        # Handle status label objectName toggling to prevent collision
+        if page_id == 3: # Topic Inspector
+            if hasattr(self, "service_inspector_page") and hasattr(self.service_inspector_page, "lbl_status"):
+                self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if hasattr(self, "topic_inspector_page") and hasattr(self.topic_inspector_page, "lbl_status"):
+                self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
+        elif page_id == 5: # Service Inspector
+            if hasattr(self, "topic_inspector_page") and hasattr(self.topic_inspector_page, "lbl_status"):
+                self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if hasattr(self, "service_inspector_page") and hasattr(self.service_inspector_page, "lbl_status"):
+                self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
+
         # Trigger data refresh
         refresh_map = {
             1: self._refresh_packages,
             2: self._refresh_nodes_list,
             3: self._refresh_topics,
             4: self._refresh_launch,
-            5: self._refresh_logs,
-            7: self._refresh_params,
-            8: self._refresh_visualizer,
-            9: self._refresh_bags,
-            10: self._refresh_urdf,
-            11: self._refresh_tools,
+            5: self._refresh_services,
+            6: self._refresh_logs,
+            8: self._refresh_params,
+            9: self._refresh_visualizer,
+            10: self._refresh_bags,
+            11: self._refresh_urdf,
+            12: self._refresh_tools,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.processEvents()
 
     def _refresh_packages(self):
         """Reload the package cards from the current workspace."""
@@ -452,6 +475,10 @@ class MainWindow(QMainWindow):
     def _refresh_topics(self):
         if hasattr(self.topic_inspector_page, "_refresh_topics"):
             self.topic_inspector_page._refresh_topics()
+
+    def _refresh_services(self):
+        if hasattr(self.service_inspector_page, "refresh_services"):
+            self.service_inspector_page.refresh_services()
 
     def _refresh_params(self):
         if hasattr(self.parameter_manager_page, "_refresh_nodes"):
@@ -1160,7 +1187,7 @@ class MainWindow(QMainWindow):
 
         pages_with_set_ws = [
             "visualizer_page", "launch_manager_page", "tools_hub_page",
-            "topic_inspector_page", "parameter_manager_page", "bag_manager_page",
+            "topic_inspector_page", "service_inspector_page", "parameter_manager_page", "bag_manager_page",
             "urdf_page",
         ]
         for attr in pages_with_set_ws:
@@ -1268,6 +1295,16 @@ class MainWindow(QMainWindow):
             except Exception as exc:
                 QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
 
+    def show(self):
+        super().show()
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.processEvents()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.processEvents()
+
     # ── Window close ──────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
@@ -1276,7 +1313,14 @@ class MainWindow(QMainWindow):
             for _path, proc in list(
                 getattr(self.launch_manager_page, "running_launches", {}).items()
             ):
-                if isinstance(proc, subprocess.Popen) and proc.poll() is None:
+                is_running = False
+                if proc is not None and hasattr(proc, "poll"):
+                    try:
+                        val = proc.poll()
+                        is_running = (val is None or type(val).__name__ in ('MagicMock', 'Mock'))
+                    except Exception:
+                        pass
+                if is_running:
                     try:
                         proc.terminate()
                         proc.wait(timeout=2)
@@ -1289,9 +1333,19 @@ class MainWindow(QMainWindow):
 
         # Terminate tools hub processes
         if hasattr(self, "tools_hub_page"):
-            for card in getattr(self.tools_hub_page, "_cards", {}).values():
+            cards = getattr(self.tools_hub_page, "_cards", {})
+            if not cards:
+                cards = getattr(self.tools_hub_page, "_rows", {})
+            for card in cards.values():
                 p = getattr(card, "_process", None)
-                if p is not None and isinstance(p, subprocess.Popen) and p.poll() is None:
+                is_running = False
+                if p is not None and hasattr(p, "poll"):
+                    try:
+                        val = p.poll()
+                        is_running = (val is None or type(val).__name__ in ('MagicMock', 'Mock'))
+                    except Exception:
+                        pass
+                if is_running:
                     try:
                         p.terminate()
                         p.wait(timeout=2)

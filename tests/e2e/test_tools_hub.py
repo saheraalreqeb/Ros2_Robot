@@ -4,6 +4,14 @@ import subprocess
 from unittest.mock import MagicMock
 from PySide6.QtWidgets import QPushButton, QLabel, QMessageBox
 from PySide6.QtCore import Qt
+from gui.tools_hub import ToolsHubPage
+
+def get_tools_hub_page(main_window):
+    for i in range(main_window.content_stack.count()):
+        widget = main_window.content_stack.widget(i)
+        if isinstance(widget, ToolsHubPage):
+            return widget
+    return None
 
 def find_button_by_text(parent, text):
     for btn in parent.findChildren(QPushButton):
@@ -22,11 +30,11 @@ def find_label_containing_text(parent, text):
 def test_tools_hub_navigation(main_window, qtbot):
     btn_tools = main_window.btn_tools
     qtbot.mouseClick(btn_tools, Qt.MouseButton.LeftButton)
-    assert main_window.content_stack.currentIndex() == 6
+    assert main_window.content_stack.currentWidget() == get_tools_hub_page(main_window)
 
 def test_tools_hub_lists_required_tools(main_window, qtbot):
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     assert find_label_containing_text(page, "RViz") is not None, "RViz should be listed"
     assert find_label_containing_text(page, "Gazebo") is not None, "Gazebo should be listed"
@@ -35,7 +43,7 @@ def test_tools_hub_lists_required_tools(main_window, qtbot):
 def test_tools_hub_launch_installed_tool(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value="/usr/bin/rviz2")
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None, "Launch RViz button not found"
@@ -49,7 +57,7 @@ def test_tools_hub_launch_installed_tool(main_window, qtbot, mocker, mock_subpro
 def test_tools_hub_warn_uninstalled_tool(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value=None)
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch Gazebo")
     assert btn is not None, "Launch Gazebo button not found"
@@ -64,7 +72,7 @@ def test_tools_hub_warn_uninstalled_tool(main_window, qtbot, mocker, mock_subpro
 def test_tools_hub_launch_multiple_tools(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value="/usr/bin/tool")
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn_rviz = find_button_by_text(page, "Launch RViz")
     btn_rqt = find_button_by_text(page, "Launch rqt")
@@ -84,7 +92,7 @@ def test_tools_hub_subprocess_error(main_window, qtbot, mocker, mock_subprocess_
     mock_subprocess_popen.side_effect = OSError("Failed to start process")
     
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None
@@ -99,7 +107,7 @@ def test_tools_hub_tool_uninstalled_while_running(main_window, qtbot, mocker, mo
     mock_which = mocker.patch("shutil.which", return_value="/usr/bin/tool")
     
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None
@@ -117,7 +125,7 @@ def test_tools_hub_tool_uninstalled_while_running(main_window, qtbot, mocker, mo
 def test_tools_hub_rapid_clicks(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value="/usr/bin/tool")
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None
@@ -130,7 +138,7 @@ def test_tools_hub_rapid_clicks(main_window, qtbot, mocker, mock_subprocess_pope
 def test_tools_hub_no_tools_installed(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value=None)
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None
@@ -144,7 +152,7 @@ def test_tools_hub_no_tools_installed(main_window, qtbot, mocker, mock_subproces
 def test_tools_hub_close_app_kills_tools(main_window, qtbot, mocker, mock_subprocess_popen):
     mocker.patch("shutil.which", return_value="/usr/bin/tool")
     main_window.btn_tools.click()
-    page = main_window.content_stack.widget(6)
+    page = get_tools_hub_page(main_window)
     
     btn = find_button_by_text(page, "Launch RViz")
     assert btn is not None

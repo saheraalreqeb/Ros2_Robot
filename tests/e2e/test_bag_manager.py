@@ -3,9 +3,17 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 from unittest.mock import MagicMock
 import os
+from gui.bag_manager import BagManagerPage
+
+def get_bag_page(main_window):
+    for i in range(main_window.content_stack.count()):
+        widget = main_window.content_stack.widget(i)
+        if isinstance(widget, BagManagerPage):
+            return widget
+    return None
 
 def test_record_all_topics(main_window, qtbot, mock_subprocess_popen):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     qtbot.mouseClick(bag_page.btn_record_all, Qt.LeftButton)
     
     mock_subprocess_popen.assert_called_once()
@@ -16,7 +24,7 @@ def test_record_all_topics(main_window, qtbot, mock_subprocess_popen):
     assert '-a' in args
 
 def test_record_selected_topics(main_window, qtbot, mock_subprocess_popen):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     bag_page.list_topics.addItem("/topic1")
     bag_page.list_topics.addItem("/topic2")
     bag_page.list_topics.item(0).setSelected(True)
@@ -33,7 +41,7 @@ def test_record_selected_topics(main_window, qtbot, mock_subprocess_popen):
     assert '/topic2' in args
 
 def test_stop_recording(main_window, qtbot, mock_subprocess_popen):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     
     qtbot.mouseClick(bag_page.btn_record_all, Qt.LeftButton)
     mock_process = mock_subprocess_popen.return_value
@@ -42,7 +50,7 @@ def test_stop_recording(main_window, qtbot, mock_subprocess_popen):
     mock_process.terminate.assert_called_once()
 
 def test_play_existing_bag_file(main_window, qtbot, mock_subprocess_popen, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     bag_page.input_bag_path.setText("/path/to/bag")
     
     mocker.patch('os.path.exists', return_value=True)
@@ -57,7 +65,7 @@ def test_play_existing_bag_file(main_window, qtbot, mock_subprocess_popen, mocke
     assert '/path/to/bag' in args
 
 def test_view_bag_info(main_window, qtbot, mock_ros2_cli, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     bag_page.input_bag_path.setText("/path/to/bag")
     
     mocker.patch('os.path.exists', return_value=True)
@@ -73,7 +81,7 @@ def test_view_bag_info(main_window, qtbot, mock_ros2_cli, mocker):
     assert "Bag Info Details" in mock_info.call_args[0][2]
 
 def test_record_with_no_topics_selected(main_window, qtbot, mock_subprocess_popen, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     
     mock_warning = mocker.patch("PySide6.QtWidgets.QMessageBox.warning")
     
@@ -83,7 +91,7 @@ def test_record_with_no_topics_selected(main_window, qtbot, mock_subprocess_pope
     assert mock_warning.called
 
 def test_play_non_existent_file(main_window, qtbot, mock_subprocess_popen, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     bag_page.input_bag_path.setText("/invalid/path")
     
     mocker.patch('os.path.exists', return_value=False)
@@ -95,11 +103,11 @@ def test_play_non_existent_file(main_window, qtbot, mock_subprocess_popen, mocke
     assert mock_warning.called
 
 def test_stop_button_disabled_when_idle(main_window, qtbot):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     assert not bag_page.btn_stop.isEnabled()
 
 def test_bag_info_error(main_window, qtbot, mock_ros2_cli, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     bag_page.input_bag_path.setText("/path/to/bag")
     
     mocker.patch('os.path.exists', return_value=True)
@@ -114,7 +122,7 @@ def test_bag_info_error(main_window, qtbot, mock_ros2_cli, mocker):
     assert mock_critical.called
 
 def test_process_launch_exception(main_window, qtbot, mock_subprocess_popen, mocker):
-    bag_page = main_window.content_stack.widget(9)
+    bag_page = get_bag_page(main_window)
     
     mock_subprocess_popen.side_effect = FileNotFoundError("ROS2 not found")
     mock_critical = mocker.patch("PySide6.QtWidgets.QMessageBox.critical")

@@ -35,26 +35,42 @@ This list is updated every time we verify a new environment.
 
 ## Installation
 
-### 1. Clone the repository
+Choose one of the two methods below to install **Ros2 Robot**. Method 1 is recommended for most users as it performs everything automatically in a single step.
+
+### Method 1: One-Line Online Installer (Recommended)
+
+Open your terminal and run the following command. This automatically downloads the installer, clones the repository to your home directory (`~/Ros2_Robot`), installs all dependencies, and configures the `ros2_robot` global command:
 
 ```bash
-git clone <your-repo-url>
+curl -sSL https://raw.githubusercontent.com/saher-m/Ros2_Robot/main/install.sh | bash
+```
+
+---
+
+### Method 2: Manual Git Repository Installation
+
+If you prefer to clone the repository to a custom location (e.g., for code modification or active development):
+
+#### 1. Clone the repository and enter the directory
+```bash
+git clone https://github.com/saher-m/Ros2_Robot.git
 cd Ros2_Robot
 ```
 
-### 2. Run the install script (one command does everything)
-
+#### 2. Run the installation script
 ```bash
 bash install.sh
 ```
 
-This script will automatically:
-- Install the missing system dependency for Qt (`libxcb-cursor0`)
-- Install all Python dependencies (`PySide6`, `psutil`, `PyYAML`, `qtawesome`)
-- Create a permanent `ros2_robot` command in `~/.local/bin` (no `sudo` required for this step)
-- Ensure `~/.local/bin` is on your `PATH`
+---
 
-> If a stale copy of `ros2_robot` exists in `/usr/local/bin` from a previous install, the script will ask for your sudo password **once** to remove it, then never need it again.
+### What the installer does automatically:
+- Installs the system dependency for Qt (`libxcb-cursor0`)
+- Installs all Python dependencies (`PySide6`, `psutil`, `PyYAML`, `qtawesome`)
+- Creates a permanent `ros2_robot` command symlink in `~/.local/bin` (no `sudo` required for this step)
+- Ensures `~/.local/bin` is added to your shell's `PATH`
+
+> If a stale copy of `ros2_robot` exists in `/usr/local/bin` from a previous installation, the script will ask for your sudo password **once** to clean it up, then run purely under user permissions.
 
 ---
 
