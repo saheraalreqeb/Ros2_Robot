@@ -341,6 +341,11 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, page_id: int):
         self.content_stack.setCurrentIndex(page_id)
+        # Ensure the correct nav button is checked programmatically
+        for p_id, attr, _, _, _ in _NAV_ENTRIES:
+            btn = self._nav_buttons.get(attr)
+            if btn:
+                btn.setChecked(p_id == page_id)
         # Update icon highlights
         self._refresh_nav_icons()
         # Trigger data refresh

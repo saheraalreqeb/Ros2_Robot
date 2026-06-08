@@ -187,20 +187,19 @@ class UnifiedLogViewerPage(QWidget):
         self.btn_err = QPushButton("ERR")
         self.btn_err.setCheckable(True)
         self.btn_err.clicked.connect(self._apply_text_filter)
-        self.btn_err.setStyleSheet(f"color: {p['danger']}; font-weight: bold;")
         toolbar.addWidget(self.btn_err)
 
         self.btn_warn = QPushButton("WARN")
         self.btn_warn.setCheckable(True)
         self.btn_warn.clicked.connect(self._apply_text_filter)
-        self.btn_warn.setStyleSheet(f"color: {p['warning']}; font-weight: bold;")
         toolbar.addWidget(self.btn_warn)
 
         self.btn_info = QPushButton("INFO")
         self.btn_info.setCheckable(True)
         self.btn_info.clicked.connect(self._apply_text_filter)
-        self.btn_info.setStyleSheet(f"color: {p['success']}; font-weight: bold;")
         toolbar.addWidget(self.btn_info)
+
+        self._style_level_buttons(p)
 
         # Autoscroll
         self.cb_autoscroll = QCheckBox("Autoscroll")
@@ -464,6 +463,72 @@ class UnifiedLogViewerPage(QWidget):
             """
         )
         self.highlighter = LogHighlighter(self.console.document(), p)
+        self._style_level_buttons(p)
         self.splitter.setStyleSheet(
             f"QSplitter::handle {{ background-color: {p['border']}; }}"
+        )
+
+    def _style_level_buttons(self, p):
+        self.btn_err.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {p['text_secondary']};
+                border: 1px solid {p['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {p['bg_hover']};
+                color: {p['text_primary']};
+            }}
+            QPushButton:checked {{
+                background-color: {p['danger']};
+                color: white;
+                border: 1px solid {p['danger']};
+            }}
+            """
+        )
+        self.btn_warn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {p['text_secondary']};
+                border: 1px solid {p['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {p['bg_hover']};
+                color: {p['text_primary']};
+            }}
+            QPushButton:checked {{
+                background-color: {p['warning']};
+                color: white;
+                border: 1px solid {p['warning']};
+            }}
+            """
+        )
+        self.btn_info.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {p['text_secondary']};
+                border: 1px solid {p['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {p['bg_hover']};
+                color: {p['text_primary']};
+            }}
+            QPushButton:checked {{
+                background-color: {p['success']};
+                color: white;
+                border: 1px solid {p['success']};
+            }}
+            """
         )
