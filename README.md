@@ -1,7 +1,8 @@
 # Ros2 Robot
 
-A modern, futuristic GUI for managing ROS 2 workspaces — built with PySide6.  
-Create packages, run nodes, inspect topics, manage bags, build launch files, and more, all from one clean interface.
+*ROS is used for robots, but isn't it time to have its own robot?*  
+
+**Ros2 Robot** is a modern, futuristic GUI designed to automate and manage your ROS 2 projects and workspaces—developed with the help of advanced coding agents. Built on PySide6, it allows you to create packages, run nodes, inspect topics, manage bags, build launch files, and more, all from one clean, premium interface.
 
 ---
 
