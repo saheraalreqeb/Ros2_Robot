@@ -60,7 +60,7 @@ fi
 # ── 1. System dependencies ─────────────────────────────────────────────────
 echo "[ 1/4 ] Installing system dependencies..."
 $SUDO apt-get update -q 2>/dev/null || true
-$SUDO apt-get install -y -q libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libgl1 libglib2.0-0 libxcb-xfixes0 2>/dev/null
+$SUDO apt-get install -y -q libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxkbcommon-x11-0 libgl1 libegl1 libglib2.0-0 2>/dev/null
 echo "        ✓  Qt platform dependencies"
 
 # ── 2. Python dependencies ─────────────────────────────────────────────────
