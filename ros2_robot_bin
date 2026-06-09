@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 # ── 1. Source ROS2 environment if not already active ──────────────────────
 if [ -z "$ROS_DISTRO" ]; then
+    ros_found=0
     for setup in \
         /opt/ros/humble/setup.bash \
         /opt/ros/iron/setup.bash \
@@ -16,9 +17,16 @@ if [ -z "$ROS_DISTRO" ]; then
         if [ -f "$setup" ]; then
             # shellcheck disable=SC1090
             source "$setup"
+            ros_found=1
             break
         fi
     done
+    
+    if [ "$ros_found" -eq 0 ]; then
+        echo -e "\033[31m❌ Error: No ROS 2 installation found on your machine.\033[0m"
+        echo "Please install ROS 2 (e.g., Humble, Iron, Jazzy, or Rolling) in order to use this software."
+        exit 1
+    fi
 fi
 
 # ── 2. Display / Qt platform setup for WSL ────────────────────────────────
