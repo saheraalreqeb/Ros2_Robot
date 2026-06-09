@@ -219,6 +219,10 @@ class MainWindow(QMainWindow):
         self._setup_content_area()
         self._load_settings()
         self._update_all_workspaces()
+        # Register shutdown hook to guarantee settings are saved
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().aboutToQuit.connect(self._save_settings)
+        
         self.statusBar().showMessage("Ready  ·  Ros2 Robot")
 
     def _get_settings_path(self):
@@ -276,6 +280,11 @@ class MainWindow(QMainWindow):
                 json.dump(settings, f, indent=4)
         except Exception:
             pass
+
+    def _force_save_settings(self):
+        """Called when the user explicitly clicks the Save Settings button."""
+        self._save_settings()
+        self.statusBar().showMessage("✓ Settings saved successfully!", 3000)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -559,6 +568,7 @@ class MainWindow(QMainWindow):
         page = SettingsPage(self)
         page.theme_changed.connect(self._on_theme_changed)
         page.tab_visibility_changed.connect(self._apply_tab_visibility)
+        page.save_requested.connect(self._force_save_settings)
         return page
 
     def _on_theme_changed(self, theme_name: str):

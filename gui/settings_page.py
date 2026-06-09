@@ -32,6 +32,7 @@ class SettingsPage(QWidget):
 
     theme_changed: Signal = Signal(str)
     tab_visibility_changed: Signal = Signal()
+    save_requested: Signal = Signal()
 
     # Tabs the user can show / hide.
     # Format:  (key, display_label, always_visible)
@@ -234,6 +235,37 @@ class SettingsPage(QWidget):
         about_lay.addLayout(links_lay)
 
         root.addWidget(about_card)
+        root.addSpacing(28)
+
+        # ── Section 4 – Save Settings ──────────────────────────────────────
+        save_lay = QHBoxLayout()
+        self.btn_save = QPushButton("  Save Settings")
+        self.btn_save.setFixedSize(160, 40)
+        self.btn_save.setCursor(Qt.PointingHandCursor)
+        self.btn_save.setStyleSheet("""
+            QPushButton {
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 8px;
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
+            }
+            QPushButton:hover {
+                background-color: palette(link);
+            }
+        """)
+        
+        try:
+            import qtawesome as qta
+            self.btn_save.setIcon(qta.icon("fa5s.save", color="white"))
+        except Exception:
+            pass
+            
+        self.btn_save.clicked.connect(self.save_requested.emit)
+        save_lay.addWidget(self.btn_save)
+        save_lay.addStretch()
+        
+        root.addLayout(save_lay)
         root.addStretch()
 
         scroll_lay = QVBoxLayout(self)
