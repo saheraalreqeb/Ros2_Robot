@@ -229,8 +229,10 @@ class MainWindow(QMainWindow):
         import json
         import os
         
+        self._is_loading_settings = True
         path = self._get_settings_path()
         if not os.path.exists(path):
+            self._is_loading_settings = False
             return
             
         try:
@@ -253,8 +255,13 @@ class MainWindow(QMainWindow):
                 self._apply_tab_visibility()
         except Exception:
             pass
+        finally:
+            self._is_loading_settings = False
 
     def _save_settings(self):
+        if getattr(self, "_is_loading_settings", False):
+            return
+            
         import json
         
         settings = {}
