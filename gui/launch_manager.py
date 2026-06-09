@@ -209,7 +209,7 @@ class LaunchManagerPage(QWidget):
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(4)
 
-        # File name — word-wrap so long names never get clipped
+        # File name, word-wrap so long names never get clipped
         lbl_name = QLabel(info["filename"])
         lbl_name.setStyleSheet("font-size: 14px; font-weight: bold;")
         lbl_name.setWordWrap(True)
@@ -358,7 +358,7 @@ class LaunchManagerPage(QWidget):
 
         p = ThemeManager.palette()
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"Launch Log — {filename}")
+        dlg.setWindowTitle(f"Launch Log, {filename}")
         dlg.resize(700, 400)
         dlg.setStyleSheet(
             f"QDialog {{ background: {p['bg_card']}; }}"

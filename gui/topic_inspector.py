@@ -1,5 +1,5 @@
 """
-Topic Inspector Page — browse, inspect, and echo ROS2 topics.
+Topic Inspector Page, browse, inspect, and echo ROS2 topics.
 
 Layout
 ------
@@ -58,7 +58,7 @@ class EchoReaderThread(QThread):
                 if line:
                     self.new_line.emit(line)
         except Exception:
-            pass  # process was killed — that's expected
+            pass  # process was killed, that's expected
 
 
 class HzMeasureThread(QThread):
@@ -911,7 +911,7 @@ class TopicInspectorPage(QWidget):
         """Terminate the echo subprocess and reader thread cleanly."""
         if self._echo_thread is not None:
             self._echo_thread.request_stop()
-            # Don't block forever — give the thread 2 s to finish
+            # Don't block forever, give the thread 2 s to finish
             self._echo_thread.wait(2000)
             self._echo_thread = None
 

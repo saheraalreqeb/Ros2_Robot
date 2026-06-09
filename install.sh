@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh — One-command installer for Ros2 Robot
+# install.sh, One-command installer for Ros2 Robot
 #
 # Usage (inside WSL):
 #   bash install.sh
@@ -45,14 +45,14 @@ LOCAL_BIN="$HOME/.local/bin"
 LINK="$LOCAL_BIN/ros2_robot"
 
 echo ""
-echo "  Ros2 Robot — Installer"
+echo "  Ros2 Robot, Installer"
 echo "  ════════════════════════════════"
 echo "  Repo: $REPO_DIR"
 echo ""
 
 # ── 0. Remove stale /usr/local/bin copy if present ────────────────────────
 if [ -f /usr/local/bin/ros2_robot ] && [ ! -L /usr/local/bin/ros2_robot ]; then
-    echo "⚠  Stale copy found in /usr/local/bin — removing (needs sudo once)..."
+    echo "⚠  Stale copy found in /usr/local/bin, removing (needs sudo once)..."
     $SUDO rm -f /usr/local/bin/ros2_robot
     echo "✓  Removed"
 fi

@@ -120,7 +120,7 @@ class ParameterManagerPage(QWidget):
 
         self.combo_nodes = QComboBox()
         self.combo_nodes.setMinimumWidth(300)
-        # No inline style — inherits from global QSS (QComboBox rule in theme.py)
+        # No inline style, inherits from global QSS (QComboBox rule in theme.py)
         self.combo_nodes.currentTextChanged.connect(self._on_node_selected)
         node_card_layout.addWidget(self.combo_nodes, 1)
 

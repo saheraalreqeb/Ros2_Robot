@@ -1,5 +1,5 @@
 """
-DDS Troubleshooter Page — Diagnose network connectivity and environment variable conflicts.
+DDS Troubleshooter Page, Diagnose network connectivity and environment variable conflicts.
 """
 
 import os

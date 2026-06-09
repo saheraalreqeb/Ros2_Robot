@@ -1,7 +1,7 @@
 #!/bin/bash
-# uninstall.sh — Removes Ros2 Robot from your system
+# uninstall.sh, Removes Ros2 Robot from your system
 
-echo "  Ros2 Robot — Uninstaller"
+echo "  Ros2 Robot, Uninstaller"
 echo "  ════════════════════════════════"
 
 # 1. Remove the local repository folder

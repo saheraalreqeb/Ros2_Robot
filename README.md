@@ -4,7 +4,7 @@
 
 **Ros2 Robot** is a simple, modern GUI designed to manage your ROS 2 projects. Think of it as **GitHub Desktop, but for ROS 2**. 
 
-It eliminates those repetitive, soul-crushing terminal commands so you can actually focus on coding and development. Built on PySide6, it lets you create packages, run nodes, inspect topics, manage bags, and build launch files—all from one clean interface.
+It eliminates those repetitive, soul-crushing terminal commands so you can actually focus on coding and development. Built on PySide6, it lets you create packages, run nodes, inspect topics, manage bags, and build launch files, all from one clean interface.
 
 ---
 
@@ -97,7 +97,7 @@ ros2_robot
 ```
 
 The GUI window will appear on your desktop (via X11/Wayland on native Linux, or WSLg on Windows).  
-The terminal will show a blinking cursor while the app is running — this is normal.
+The terminal will show a blinking cursor while the app is running, this is normal.
 
 To run in the background and get your terminal back:
 
@@ -210,7 +210,7 @@ bash install.sh
 
 ## Development
 
-The app is installed in **editable mode**, so any changes you make to the source files are reflected immediately — no reinstall needed.
+The app is installed in **editable mode**, so any changes you make to the source files are reflected immediately, no reinstall needed.
 
 ```
 Ros2_Robot/

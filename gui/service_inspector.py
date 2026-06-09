@@ -1,5 +1,5 @@
 """
-Service Inspector Page — scan, inspect, and call ROS2 services.
+Service Inspector Page, scan, inspect, and call ROS2 services.
 
 Layout
 ------
