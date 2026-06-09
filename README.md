@@ -16,12 +16,12 @@
 
 | Requirement | Version |
 |---|---|
-| OS | Windows 10/11 with **WSL 2** (Ubuntu 22.04 recommended) |
+| OS | **Native Linux** (Ubuntu 22.04/24.04) or Windows 10/11 with **WSL 2** |
 | ROS 2 | Humble / Iron / Jazzy / Rolling |
 | Python | 3.8 + |
-| WSLg | Required for GUI rendering (included in WSL 2 by default) |
+| Display | Native X11/Wayland (Linux) or WSLg (Windows) |
 
-> **All commands below must be run inside your WSL terminal**, not Windows PowerShell/CMD.
+> **All commands below must be run inside your Linux or WSL terminal**, not Windows PowerShell/CMD.
 
 ### Tested Environments
 
@@ -76,13 +76,13 @@ bash install.sh
 
 ## Running the App
 
-Open any WSL terminal and run:
+Open your Linux or WSL terminal and run:
 
 ```bash
 ros2_robot
 ```
 
-The GUI window will appear on your Windows desktop via **WSLg**.  
+The GUI window will appear on your desktop (via X11/Wayland on native Linux, or WSLg on Windows).  
 The terminal will show a blinking cursor while the app is running — this is normal.
 
 To run in the background and get your terminal back:
@@ -170,12 +170,12 @@ sudo apt-get install -y libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libgl
 
 > **Note for Docker users:** If the error persists after installing these libraries, it means your container cannot connect to the host's screen. Ensure you passed the `DISPLAY` flags when starting the container (see **Running in Docker** above).
 
-### `ros2_robot` command not found after re-opening WSL
+### `ros2_robot` command not found after re-opening terminal
 
 Re-run the install script:
 
 ```bash
-bash /mnt/c/Users/pc/Desktop/Ros2_Robot/install.sh
+bash ~/Ros2_Robot/install.sh
 ```
 
 Or source your profile manually:
