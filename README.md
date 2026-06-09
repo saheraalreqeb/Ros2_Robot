@@ -74,6 +74,18 @@ bash install.sh
 
 ---
 
+## Uninstallation
+
+To completely remove **Ros2 Robot** from your system (including settings, the executable command, and the repository folder), simply run this one-line command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/saheraalreqeb/Ros2_Robot/main/uninstall.sh | bash
+```
+
+Alternatively, if you installed it manually via Git, you can just run `bash uninstall.sh` directly from inside the repository folder.
+
+---
+
 ## Running the App
 
 Open your Linux or WSL terminal and run:
