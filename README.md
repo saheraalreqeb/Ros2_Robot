@@ -93,6 +93,36 @@ ros2_robot &
 
 ---
 
+## Running in Docker
+
+By default, Docker containers are entirely "headless" and isolated from your host's monitor. If you want to run `ros2_robot` from inside a Docker container, you must launch the container with specific display sockets mapped to your host.
+
+### For Windows/WSL2 Users (WSLg)
+If you are running Docker inside WSL2, map the WSLg sockets into the container:
+
+```bash
+docker run -it \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v /mnt/wslg:/mnt/wslg \
+    -e DISPLAY=$DISPLAY \
+    -e WAYLAND_DISPLAY=$WAYLAND_DISPLAY \
+    -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+    -e PULSE_SERVER=$PULSE_SERVER \
+    <your-image-name> /bin/bash
+```
+
+### For Windows Users (Docker Desktop)
+If you are using Docker Desktop natively on Windows without WSLg:
+1. Install an X11 server like **VcXsrv** on Windows and start it (ensure you check "Disable access control").
+2. Run your container with the internal host display:
+```bash
+docker run -it -e DISPLAY=host.docker.internal:0.0 <your-image-name> /bin/bash
+```
+
+Once inside the container, run the `install.sh` script or launch `ros2_robot` directly.
+
+---
+
 ## Features
 
 | Tab | Description |
@@ -131,11 +161,14 @@ wsl --update
 
 ### Qt platform plugin error (`xcb` or `wayland`)
 
-Install the missing system library:
+If you receive a "no Qt platform plugin could be initialized" error (especially in slim Docker containers), install the missing system headless libraries:
 
 ```bash
-sudo apt-get install -y libxcb-cursor0
+sudo apt-get update
+sudo apt-get install -y libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libgl1 libegl1 libglib2.0-0
 ```
+
+> **Note for Docker users:** If the error persists after installing these libraries, it means your container cannot connect to the host's screen. Ensure you passed the `DISPLAY` flags when starting the container (see **Running in Docker** above).
 
 ### `ros2_robot` command not found after re-opening WSL
 
