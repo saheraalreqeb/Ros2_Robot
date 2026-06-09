@@ -12,6 +12,15 @@
 
 set -e
 
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    if ! command -v sudo &> /dev/null; then
+        echo "❌ sudo is required but not installed. Please install sudo or run as root."
+        exit 1
+    fi
+    SUDO="sudo"
+fi
+
 # Detect if we are running from a local checkout or via curl/wget
 if [ -f "requirements.txt" ] && [ -f "main.py" ]; then
     REPO_DIR="$(pwd)"
@@ -24,7 +33,7 @@ else
     echo "➡  Cloning Ros2_Robot repository to $INSTALL_DIR..."
     if ! command -v git &> /dev/null; then
         echo "❌  git is not installed. Installing git (requires sudo)..."
-        sudo apt-get update -q && sudo apt-get install -y -q git
+        $SUDO apt-get update -q && $SUDO apt-get install -y -q git
     fi
     rm -rf "$INSTALL_DIR"
     git clone https://github.com/saheraalreqeb/Ros2_Robot.git "$INSTALL_DIR"
@@ -44,13 +53,14 @@ echo ""
 # ── 0. Remove stale /usr/local/bin copy if present ────────────────────────
 if [ -f /usr/local/bin/ros2_robot ] && [ ! -L /usr/local/bin/ros2_robot ]; then
     echo "⚠  Stale copy found in /usr/local/bin — removing (needs sudo once)..."
-    sudo rm -f /usr/local/bin/ros2_robot
+    $SUDO rm -f /usr/local/bin/ros2_robot
     echo "✓  Removed"
 fi
 
 # ── 1. System dependencies ─────────────────────────────────────────────────
 echo "[ 1/4 ] Installing system dependencies..."
-sudo apt-get install -y -q libxcb-cursor0 2>/dev/null
+$SUDO apt-get update -q 2>/dev/null || true
+$SUDO apt-get install -y -q libxcb-cursor0 2>/dev/null
 echo "        ✓  libxcb-cursor0"
 
 # ── 2. Python dependencies ─────────────────────────────────────────────────
