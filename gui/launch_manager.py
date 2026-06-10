@@ -75,8 +75,8 @@ class LaunchManagerPage(QWidget):
         self._refresh_launch_files()
 
     def refresh_theme(self) -> None:
-        """Refresh the cards and local styles when the global theme changes."""
-        self._refresh_launch_files()
+        """Refresh local elements if needed, styles are refreshed globally."""
+        pass
 
     def _monitor_running_launches(self) -> None:
         """Polls running processes and refreshes the cards if any process has exited."""
