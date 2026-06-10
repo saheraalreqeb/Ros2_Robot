@@ -82,25 +82,27 @@ echo "        ✓  Qt platform dependencies"
 
 # ── 2. Python dependencies ─────────────────────────────────────────────────
 echo "[ 2/5 ] Installing Python dependencies..."
-if ! command -v pip3 &> /dev/null; then
-    echo "pip3 wasn't installed >>> installing pip3..."
+if ! command -v pip3 &> /dev/null || ! python3 -m venv --help &> /dev/null; then
+    echo "Required Python packages (pip/venv) are missing >>> installing them..."
     if command -v apt-get &> /dev/null; then
         $SUDO apt-get update -q 2>/dev/null || true
-        $SUDO apt-get install -y -q python3-pip 2>/dev/null
+        $SUDO apt-get install -y -q python3-pip python3-venv 2>/dev/null
     elif command -v dnf &> /dev/null; then
         $SUDO dnf install -y python3-pip 2>/dev/null || true
     elif command -v pacman &> /dev/null; then
         $SUDO pacman -Sy --noconfirm python-pip 2>/dev/null || true
     fi
-    echo ">> install done, you need to open a new terminal and rerun the installation."
-    exit 1
 fi
 
-if ! pip3 install -q -r "$REPO_DIR/requirements.txt" 2>/dev/null; then
-    # Fallback for PEP 668 externally-managed environments (e.g., Ubuntu 24.04 / Jazzy)
-    pip3 install -q --break-system-packages -r "$REPO_DIR/requirements.txt"
+VENV_DIR="$REPO_DIR/.venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating transparent Python virtual environment..."
+    python3 -m venv --system-site-packages "$VENV_DIR"
 fi
-echo "        ✓  PySide6, psutil, PyYAML, qtawesome"
+
+echo "Installing requirements into isolated environment..."
+"$VENV_DIR/bin/pip" install -q -r "$REPO_DIR/requirements.txt"
+echo "        ✓  PySide6, psutil, PyYAML, qtawesome (isolated)"
 
 # ── 3. Create ~/.local/bin symlink ─────────────────────────────────────────
 echo "[ 3/5 ] Creating ros2_robot command..."
