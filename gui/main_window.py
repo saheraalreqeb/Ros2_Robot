@@ -1854,6 +1854,31 @@ class MainWindow(QMainWindow):
             except Exception as exc:
                 QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
 
+    def _load_active_tabs(self):
+        prop_map = {
+            0: "workspace_page",
+            1: "packages_page",
+            2: "nodes_page",
+            3: "topic_inspector_page",
+            4: "launch_manager_page",
+            5: "service_inspector_page",
+            6: "log_viewer_page",
+            7: "dds_troubleshooter_page",
+            8: "parameter_manager_page",
+            9: "visualizer_page",
+            10: "bag_manager_page",
+            11: "urdf_page",
+            12: "tools_hub_page",
+        }
+        from PySide6.QtCore import QCoreApplication
+        for page_id, attr, _, _, _ in _NAV_ENTRIES:
+            btn = self._nav_buttons.get(attr)
+            if btn and btn.isVisible() and page_id in prop_map:
+                placeholder = self.content_stack.widget(page_id)
+                if placeholder and placeholder.property("is_placeholder"):
+                    getattr(self, prop_map[page_id])
+                    QCoreApplication.processEvents()
+
     def show(self):
         super().show()
         from PySide6.QtCore import QCoreApplication
@@ -1861,8 +1886,9 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
-        from PySide6.QtCore import QCoreApplication
+        from PySide6.QtCore import QCoreApplication, QTimer
         QCoreApplication.processEvents()
+        QTimer.singleShot(100, self._load_active_tabs)
 
     # ── Window close ──────────────────────────────────────────────────────────
 
