@@ -43,3 +43,6 @@ include = ["core*", "gui*"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+markers = [
+    "gui: Graphical User Interface E2E tests requiring a display server"
+]
