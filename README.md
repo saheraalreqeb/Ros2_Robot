@@ -141,13 +141,15 @@ Once inside the container, run the `install.sh` script or launch `ros2_robot` di
 
 | Tab | Description |
 |---|---|
-| **Workspace** | Open or initialise `colcon` workspaces. Build with `colcon build` directly from the UI. |
+| **Workspace** | Open or initialize `colcon` workspaces. Build using an interactive colcon console with package selection, clean build toggle, and live output streaming. |
 | **Packages** | Create ROS 2 packages (`ament_python` or `ament_cmake`) with one click. |
 | **Nodes** | View all nodes in the workspace. Run or stop individual nodes with a button. |
 | **Visualizer** | Live graph of publishers and subscribers across your running nodes. |
 | **Launch Manager** | Visually build `.launch.py` files, then run them with live log output. |
 | **Tools Hub** | Check and launch common ROS 2 tools (rqt, rviz2, gazebo, etc.). |
 | **Topic Inspector** | Browse all active topics, view message types, and echo live data. |
+| **Service Inspector** | Browse all active services and call them from the UI. |
+| **Action Inspector** | Browse all active actions, view details, and send goals interactively with live progress feedback. |
 | **Parameters** | Read and set node parameters. Dump/load YAML parameter files. |
 | **Bag Manager** | Record and replay ROS 2 bag files with loop and rate controls. |
 | **Settings** | Switch between **Dark** and **Light** themes. Show/hide sidebar tabs. |
@@ -229,6 +231,8 @@ Ros2_Robot/
     ├── launch_manager.py    # Launch file builder & runner
     ├── tools_hub.py         # ROS 2 tools cards
     ├── topic_inspector.py   # Topic browser & echo
+    ├── service_inspector.py # Service browser & caller
+    ├── action_inspector.py  # Action browser & goal sender
     ├── parameter_manager.py # Node parameter editor
     ├── bag_manager.py       # Bag record & playback
     └── visualizer.py        # Network graph
