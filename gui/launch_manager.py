@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QMessageBox, QFormLayout, QGroupBox,
     QSizePolicy, QAbstractItemView, QTabWidget
 )
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import Qt, QSize, Signal, QTimer
 
 from core.workspace import ROS2Workspace
 from gui.flow_layout import FlowLayout
@@ -55,6 +55,11 @@ class LaunchManagerPage(QWidget):
         self._build_ui()
         self._refresh_launch_files()
 
+        self.monitor_timer = QTimer(self)
+        self.monitor_timer.setInterval(1000)
+        self.monitor_timer.timeout.connect(self._monitor_running_launches)
+        self.monitor_timer.start()
+
     # ── public API ────────────────────────────────────────────────────────────
 
     def set_workspace(self, path: str) -> None:
@@ -68,6 +73,21 @@ class LaunchManagerPage(QWidget):
         if main_win and hasattr(main_win, "current_workspace_path"):
             self.workspace_path = main_win.current_workspace_path
         self._refresh_launch_files()
+
+    def refresh_theme(self) -> None:
+        """Refresh the cards and local styles when the global theme changes."""
+        self._refresh_launch_files()
+
+    def _monitor_running_launches(self) -> None:
+        """Polls running processes and refreshes the cards if any process has exited."""
+        exited = []
+        for key, proc in list(self.running_launches.items()):
+            if proc is None or proc.poll() is not None:
+                exited.append(key)
+                if key in self.running_launches:
+                    del self.running_launches[key]
+        if exited:
+            self._refresh_launch_files()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -102,7 +122,6 @@ class LaunchManagerPage(QWidget):
         btn_create = QPushButton("Create Launch File")
         btn_create.setObjectName("btnNewLaunch")
         btn_create.setProperty("class", "action-button")
-        btn_create.setStyleSheet("background-color: #0e639c; color: white;")
         btn_create.setToolTip(
             "<b>Visual Launch File Builder</b><br>"
             "Compose a launch file by adding Node and Timer blocks, "
@@ -155,7 +174,8 @@ class LaunchManagerPage(QWidget):
                 f"No valid workspace found at:\n{self.workspace_path}\n\n"
                 "Please open or initialise a workspace first."
             )
-            lbl.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 14px;")
+            lbl.setProperty("class", "muted")
+            lbl.setStyleSheet("font-style: italic; font-size: 14px;")
             self._cards_layout.addWidget(lbl)
             return
 
@@ -171,7 +191,8 @@ class LaunchManagerPage(QWidget):
                 "Click \"Create Launch File\" to build one."
             )
             lbl.setObjectName("emptyStateLabel")
-            lbl.setStyleSheet("color: #aaaaaa; font-style: italic; font-size: 14px;")
+            lbl.setProperty("class", "muted")
+            lbl.setStyleSheet("font-style: italic; font-size: 14px;")
             self._cards_layout.addWidget(lbl)
             return
 
@@ -271,16 +292,31 @@ class LaunchManagerPage(QWidget):
         # ── Stop if already running ────────────────────────────────────────
         if key in self.running_launches:
             proc = self.running_launches[key]
-            if proc is not None and isinstance(proc, subprocess.Popen) and proc.poll() is None:
+            use_wsl = bool(self.cli and self.cli.use_wsl)
+            
+            # 1. Terminate the wrapper process
+            if proc is not None and isinstance(proc, subprocess.Popen):
                 proc.terminate()
                 try:
-                    proc.wait(timeout=5)
+                    proc.wait(timeout=2)
                 except Exception:
                     proc.kill()
+            
+            # 2. Kill the underlying ros2 launch process tree inside WSL or Linux
+            try:
+                if use_wsl:
+                    subprocess.run(["wsl", "pkill", "-f", f"ros2 launch.*{filename}"], capture_output=True)
+                else:
+                    subprocess.run(["pkill", "-f", f"ros2 launch.*{filename}"], capture_output=True)
+            except Exception:
+                pass
+                
+            if key in self.running_launches:
                 del self.running_launches[key]
-                btn.setText("Launch")
-                self._update_btn_class(btn, "btn-success")
-                return
+                
+            btn.setText("Launch")
+            self._update_btn_class(btn, "btn-success")
+            return
 
         # ── Launch ────────────────────────────────────────────────────────
         try:
