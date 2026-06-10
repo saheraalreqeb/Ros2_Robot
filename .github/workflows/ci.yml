@@ -36,5 +36,8 @@ jobs:
           pip install pytest pytest-qt
 
       - name: Run E2E Tests (Headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_DEBUG_PLUGINS: 1
         run: |
-          xvfb-run --auto-servernum python -m pytest tests/
+          python -m pytest tests/
