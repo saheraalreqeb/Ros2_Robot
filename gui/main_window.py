@@ -512,6 +512,10 @@ class MainWindow(QMainWindow):
         self._setup_content_area()
         self._load_settings()
         self._update_all_workspaces()
+        
+        # Switch to the Workspace page (index 0) immediately so it doesn't render empty
+        self._switch_page(0)
+
         # Register shutdown hook to guarantee settings are saved and threads stopped
         from PySide6.QtWidgets import QApplication
         QApplication.instance().aboutToQuit.connect(self._on_shutdown)
@@ -740,6 +744,7 @@ class MainWindow(QMainWindow):
             if page_id == 0:
                 page = self._create_workspace_page()
                 self._workspace_page = page
+                self._update_build_packages_combo()
             elif page_id == 1:
                 page = self._create_packages_page()
                 self._packages_page = page
@@ -789,9 +794,12 @@ class MainWindow(QMainWindow):
             if hasattr(page, "refresh_theme"):
                 page.refresh_theme()
 
+            is_current = (self.content_stack.currentIndex() == page_id)
             self.content_stack.removeWidget(placeholder)
             placeholder.deleteLater()
             self.content_stack.insertWidget(page_id, page)
+            if is_current:
+                self.content_stack.setCurrentIndex(page_id)
         finally:
             self._instantiating_pages.remove(page_id)
 
