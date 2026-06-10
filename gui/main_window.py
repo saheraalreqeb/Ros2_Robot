@@ -1424,22 +1424,29 @@ class MainWindow(QMainWindow):
         self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
         cfg_row.addWidget(self.txt_cmake_args)
 
+        build_card_lay.addLayout(cfg_row)
+
+        # Controls & Status Row
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(15)
+
         self.btn_start_build = _action_btn("Start Build", "fa5s.play")
         self.btn_start_build.clicked.connect(self._start_colcon_build)
-        cfg_row.addWidget(self.btn_start_build)
+        ctrl_row.addWidget(self.btn_start_build)
 
         self.btn_cancel_build = QPushButton("Cancel")
         self.btn_cancel_build.setEnabled(False)
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
-        cfg_row.addWidget(self.btn_cancel_build)
+        ctrl_row.addWidget(self.btn_cancel_build)
 
         self.lbl_build_badge = QLabel("Idle")
         self.lbl_build_badge.setStyleSheet(
             "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
         )
-        cfg_row.addWidget(self.lbl_build_badge)
+        ctrl_row.addWidget(self.lbl_build_badge)
+        ctrl_row.addStretch()
 
-        build_card_lay.addLayout(cfg_row)
+        build_card_lay.addLayout(ctrl_row)
 
         # Console Output
         self.txt_build_console = QTextEdit()
