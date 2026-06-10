@@ -31,7 +31,7 @@ import subprocess
 
 import psutil
 import qtawesome as qta
-from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QObject, QEvent
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -277,6 +277,23 @@ _TAB_KEY_FOR_BTN = {
     "btn_tools":          "tools",
     "btn_settings":       "settings",
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  HelpButtonResizer
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class HelpButtonResizer(QObject):
+    def __init__(self, help_btn):
+        super().__init__(help_btn)
+        self.help_btn = help_btn
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            w = obj.width()
+            self.help_btn.move(w - 24 - 16, 12)
+            self.help_btn.raise_()
+        return super().eventFilter(obj, event)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1169,7 +1186,7 @@ class MainWindow(QMainWindow):
 
     def _attach_help_button_to_page(self, page_id: int, page: QWidget):
         # Create local help button
-        help_btn = QPushButton()
+        help_btn = QPushButton(page)
         help_btn.setObjectName(f"help_btn_{page_id}")
         help_btn.setToolTip("Show screen documentation & ROS 2 commands")
         help_btn.setFixedSize(24, 24)
@@ -1190,23 +1207,15 @@ class MainWindow(QMainWindow):
             self._local_help_buttons = {}
         self._local_help_buttons[page_id] = help_btn
 
-        # Try to find root layout of page
-        layout = page.layout()
-        if not layout:
-            # If no layout, just create a layout
-            layout = QVBoxLayout(page)
-            
-        # Create a separate transparent line containing only the info button at the top of all tabs
-        header_lay = QHBoxLayout()
-        header_lay.setContentsMargins(0, 0, 16, 0)
-        header_lay.addStretch()
-        header_lay.addWidget(help_btn)
-        
-        # We insert it at index 0 of the page's root layout
-        if hasattr(layout, "insertLayout"):
-            layout.insertLayout(0, header_lay)
-        else:
-            layout.addLayout(header_lay)
+        # Move to initial position and raise to ensure it overlays layout content
+        help_btn.move(page.width() - 24 - 16, 12)
+        help_btn.raise_()
+
+        # Install resize event filter to keep it positioned at the top-right
+        resizer = HelpButtonResizer(help_btn)
+        page.installEventFilter(resizer)
+        # Store resizer reference on the button so it isn't garbage collected
+        help_btn.resizer = resizer
 
     def _show_help_dialog_for_page(self, page_id: int):
         import json
