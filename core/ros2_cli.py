@@ -233,3 +233,33 @@ class ROS2CLI:
             return [line.strip() for line in output.split('\n') if line.strip()]
         except RuntimeError:
             return []
+
+    def action_list(self) -> List[str]:
+        """
+        List active ROS2 actions.
+        
+        Returns:
+            List[str]: List of active action names.
+        """
+        cmd = ['ros2', 'action', 'list']
+        try:
+            output = self._run_command(cmd)
+            return [line.strip() for line in output.split('\n') if line.strip()]
+        except RuntimeError:
+            return []
+
+    def action_info(self, name: str) -> str:
+        """
+        Get info for a ROS2 action.
+        
+        Args:
+            name (str): Action name.
+            
+        Returns:
+            str: Raw action info output.
+        """
+        cmd = ['ros2', 'action', 'info', name]
+        try:
+            return self._run_command(cmd)
+        except RuntimeError as exc:
+            return str(exc)

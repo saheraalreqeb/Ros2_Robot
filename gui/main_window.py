@@ -50,6 +50,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QDialog,
+    QComboBox,
+    QCheckBox,
+    QLineEdit,
+    QTextEdit,
 )
 
 from core.code_generator import CodeGenerator
@@ -65,6 +69,7 @@ from gui.theme import ThemeManager
 from gui.tools_hub import ToolsHubPage
 from gui.topic_inspector import TopicInspectorPage
 from gui.service_inspector import ServiceInspectorPage
+from gui.action_inspector import ActionInspectorPage
 from gui.visualizer import VisualizerPage
 from gui.dds_troubleshooter import DDSTroubleshooterPage
 from gui.log_viewer import UnifiedLogViewerPage
@@ -87,10 +92,12 @@ class DiscoveryDaemon(QThread):
             nodes = self.cli.node_list()
             topics = self.cli.topic_list()
             services = self.cli.service_list()
+            actions = self.cli.action_list() if hasattr(self.cli, "action_list") else []
             self.updated.emit({
                 "nodes": nodes,
                 "topics": topics,
-                "services": services
+                "services": services,
+                "actions": actions
             })
             for _ in range(50):
                 if not self.running:
@@ -99,6 +106,84 @@ class DiscoveryDaemon(QThread):
 
     def stop(self):
         self.running = False
+
+
+class ColconBuildWorker(QThread):
+    new_line = Signal(str)
+    finished_signal = Signal(bool, str)
+
+    def __init__(self, workspace_path: str, use_wsl: bool = False, build_args: list = None, clean_first: bool = False):
+        super().__init__()
+        self.workspace_path = workspace_path
+        self.use_wsl = use_wsl
+        self.build_args = build_args or []
+        self.clean_first = clean_first
+        self.process = None
+
+    def run(self):
+        try:
+            # 1. Handle clean if checked
+            if self.clean_first:
+                self.new_line.emit("Cleaning workspace build folders (build, install, log)...\n")
+                import shutil
+                for folder in ["build", "install", "log"]:
+                    fp = os.path.join(self.workspace_path, folder)
+                    if os.path.exists(fp):
+                        try:
+                            shutil.rmtree(fp)
+                            self.new_line.emit(f"Deleted {folder}/\n")
+                        except Exception as e:
+                            self.new_line.emit(f"Failed to delete {folder}: {e}\n")
+
+            # 2. Build build command list
+            colcon_args = ["colcon", "build"] + self.build_args
+            colcon_cmd_str = " ".join(colcon_args)
+            self.new_line.emit(f"Starting build: {colcon_cmd_str}\n\n")
+
+            # 3. Handle WSL path conversion if needed
+            if self.use_wsl:
+                import re
+                def to_wsl_path(p):
+                    p = p.replace('\\', '/')
+                    m = re.match(r'^([a-zA-Z]):(.*)', p)
+                    return f"/mnt/{m.group(1).lower()}{m.group(2)}" if m else p
+
+                ws_wsl = to_wsl_path(self.workspace_path)
+                cmd = ["wsl", "bash", "-i", "-c", f'cd "{ws_wsl}" && {colcon_cmd_str}']
+                run_cwd = None
+            else:
+                cmd = ["powershell.exe", "-Command", colcon_cmd_str] if os.name == "nt" else ["bash", "-c", colcon_cmd_str]
+                run_cwd = self.workspace_path
+
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=run_cwd,
+                bufsize=1
+            )
+            
+            for line in iter(self.process.stdout.readline, ""):
+                self.new_line.emit(line)
+            
+            self.process.stdout.close()
+            return_code = self.process.wait()
+            self.finished_signal.emit(return_code == 0, "")
+        except Exception as exc:
+            self.new_line.emit(f"Build exception: {exc}\n")
+            self.finished_signal.emit(False, str(exc))
+
+    def terminate_process(self):
+        if self.process:
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=1)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
 
 
 class BuildThread(QThread):
@@ -163,14 +248,15 @@ _NAV_ENTRIES = [
     (3, "btn_topics",         "Topic Inspector",   "fa5s.satellite-dish", "_refresh_topics"),
     (4, "btn_launch",         "Launch Manager",    "fa5s.rocket",         "_refresh_launch"),
     (5, "btn_services",       "Service Inspector", "fa5s.handshake",      "_refresh_services"),
-    (6, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
-    (7, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
-    (8, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
-    (9, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
-    (10, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
-    (11, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
-    (12, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
-    (13, "btn_settings",      "Settings",          "fa5s.cog",            None),
+    (6, "btn_actions",        "Action Inspector",  "fa5s.bullseye",       "_refresh_actions"),
+    (7, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
+    (8, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
+    (9, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
+    (10, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
+    (11, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
+    (12, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
+    (13, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
+    (14, "btn_settings",      "Settings",          "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -181,6 +267,7 @@ _TAB_KEY_FOR_BTN = {
     "btn_topics":         "topics",
     "btn_launch":         "launch",
     "btn_services":       "services",
+    "btn_actions":        "actions",
     "btn_logs":           "logs",
     "btn_troubleshooter": "troubleshooter",
     "btn_params":         "params",
@@ -397,7 +484,8 @@ class MainWindow(QMainWindow):
         self.discovery_cache = {
             "nodes": [],
             "topics": [],
-            "services": []
+            "services": [],
+            "actions": []
         }
         self.discovery_daemon = DiscoveryDaemon(self.cli)
         self.discovery_daemon.updated.connect(self._on_discovery_updated)
@@ -617,6 +705,7 @@ class MainWindow(QMainWindow):
         self._topic_inspector_page = None
         self._launch_manager_page = None
         self._service_inspector_page = None
+        self._action_page = None
         self._log_viewer_page = None
         self._dds_troubleshooter_page = None
         self._parameter_manager_page = None
@@ -624,9 +713,9 @@ class MainWindow(QMainWindow):
         self._bag_manager_page = None
         self._urdf_page = None
         self._tools_hub_page = None
-        self.settings_page = self._create_settings_page()   # 13
+        self.settings_page = self._create_settings_page()   # 14
 
-        for i in range(13):
+        for i in range(14):
             placeholder = QWidget()
             placeholder.setProperty("is_placeholder", True)
             self.content_stack.addWidget(placeholder)
@@ -666,24 +755,27 @@ class MainWindow(QMainWindow):
                 page = ServiceInspectorPage(self.cli)
                 self._service_inspector_page = page
             elif page_id == 6:
+                page = ActionInspectorPage(self.cli)
+                self._action_page = page
+            elif page_id == 7:
                 page = UnifiedLogViewerPage(self.cli)
                 self._log_viewer_page = page
-            elif page_id == 7:
+            elif page_id == 8:
                 page = DDSTroubleshooterPage(self.cli)
                 self._dds_troubleshooter_page = page
-            elif page_id == 8:
+            elif page_id == 9:
                 page = ParameterManagerPage(self.cli)
                 self._parameter_manager_page = page
-            elif page_id == 9:
+            elif page_id == 10:
                 page = VisualizerPage(self.cli)
                 self._visualizer_page = page
-            elif page_id == 10:
+            elif page_id == 11:
                 page = BagManagerPage(self.cli)
                 self._bag_manager_page = page
-            elif page_id == 11:
+            elif page_id == 12:
                 page = URDFViewerPage(self.cli)
                 self._urdf_page = page
-            elif page_id == 12:
+            elif page_id == 13:
                 page = ToolsHubPage(self.cli)
                 self._tools_hub_page = page
             else:
@@ -762,9 +854,19 @@ class MainWindow(QMainWindow):
         self._service_inspector_page = val
 
     @property
+    def action_page(self):
+        if getattr(self, "_action_page", None) is None:
+            self._instantiate_page(6)
+        return self._action_page
+
+    @action_page.setter
+    def action_page(self, val):
+        self._action_page = val
+
+    @property
     def log_viewer_page(self):
         if getattr(self, "_log_viewer_page", None) is None:
-            self._instantiate_page(6)
+            self._instantiate_page(7)
         return self._log_viewer_page
 
     @log_viewer_page.setter
@@ -774,7 +876,7 @@ class MainWindow(QMainWindow):
     @property
     def dds_troubleshooter_page(self):
         if getattr(self, "_dds_troubleshooter_page", None) is None:
-            self._instantiate_page(7)
+            self._instantiate_page(8)
         return self._dds_troubleshooter_page
 
     @dds_troubleshooter_page.setter
@@ -784,7 +886,7 @@ class MainWindow(QMainWindow):
     @property
     def parameter_manager_page(self):
         if getattr(self, "_parameter_manager_page", None) is None:
-            self._instantiate_page(8)
+            self._instantiate_page(9)
         return self._parameter_manager_page
 
     @parameter_manager_page.setter
@@ -794,7 +896,7 @@ class MainWindow(QMainWindow):
     @property
     def visualizer_page(self):
         if getattr(self, "_visualizer_page", None) is None:
-            self._instantiate_page(9)
+            self._instantiate_page(10)
         return self._visualizer_page
 
     @visualizer_page.setter
@@ -804,7 +906,7 @@ class MainWindow(QMainWindow):
     @property
     def bag_manager_page(self):
         if getattr(self, "_bag_manager_page", None) is None:
-            self._instantiate_page(10)
+            self._instantiate_page(11)
         return self._bag_manager_page
 
     @bag_manager_page.setter
@@ -814,7 +916,7 @@ class MainWindow(QMainWindow):
     @property
     def urdf_page(self):
         if getattr(self, "_urdf_page", None) is None:
-            self._instantiate_page(11)
+            self._instantiate_page(12)
         return self._urdf_page
 
     @urdf_page.setter
@@ -824,7 +926,7 @@ class MainWindow(QMainWindow):
     @property
     def tools_hub_page(self):
         if getattr(self, "_tools_hub_page", None) is None:
-            self._instantiate_page(12)
+            self._instantiate_page(13)
         return self._tools_hub_page
 
     @tools_hub_page.setter
@@ -842,20 +944,21 @@ class MainWindow(QMainWindow):
             3: "topic_inspector_page",
             4: "launch_manager_page",
             5: "service_inspector_page",
-            6: "log_viewer_page",
-            7: "dds_troubleshooter_page",
-            8: "parameter_manager_page",
-            9: "visualizer_page",
-            10: "bag_manager_page",
-            11: "urdf_page",
-            12: "tools_hub_page",
+            6: "action_page",
+            7: "log_viewer_page",
+            8: "dds_troubleshooter_page",
+            9: "parameter_manager_page",
+            10: "visualizer_page",
+            11: "bag_manager_page",
+            12: "urdf_page",
+            13: "tools_hub_page",
         }
         if page_id in prop_map:
             getattr(self, prop_map[page_id])
 
         self.content_stack.setCurrentIndex(page_id)
         if hasattr(self, "help_btn"):
-            self.help_btn.setVisible(page_id != 13)
+            self.help_btn.setVisible(page_id != 14)
         # Ensure the correct nav button is checked programmatically
         for p_id, attr, _, _, _ in _NAV_ENTRIES:
             btn = self._nav_buttons.get(attr)
@@ -868,13 +971,24 @@ class MainWindow(QMainWindow):
         if page_id == 3: # Topic Inspector
             if getattr(self, "_service_inspector_page", None) is not None and hasattr(self.service_inspector_page, "lbl_status"):
                 self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if getattr(self, "_action_page", None) is not None and hasattr(self.action_page, "lbl_status"):
+                self.action_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
             if getattr(self, "_topic_inspector_page", None) is not None and hasattr(self.topic_inspector_page, "lbl_status"):
                 self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
         elif page_id == 5: # Service Inspector
             if getattr(self, "_topic_inspector_page", None) is not None and hasattr(self.topic_inspector_page, "lbl_status"):
                 self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if getattr(self, "_action_page", None) is not None and hasattr(self.action_page, "lbl_status"):
+                self.action_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
             if getattr(self, "_service_inspector_page", None) is not None and hasattr(self.service_inspector_page, "lbl_status"):
                 self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
+        elif page_id == 6: # Action Inspector
+            if getattr(self, "_topic_inspector_page", None) is not None and hasattr(self.topic_inspector_page, "lbl_status"):
+                self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if getattr(self, "_service_inspector_page", None) is not None and hasattr(self.service_inspector_page, "lbl_status"):
+                self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+            if getattr(self, "_action_page", None) is not None and hasattr(self.action_page, "lbl_status"):
+                self.action_page.lbl_status.setObjectName("lbl_inspector_status")
 
         # Trigger data refresh
         refresh_map = {
@@ -883,12 +997,13 @@ class MainWindow(QMainWindow):
             3: self._refresh_topics,
             4: self._refresh_launch,
             5: self._refresh_services,
-            6: self._refresh_logs,
-            8: self._refresh_params,
-            9: self._refresh_visualizer,
-            10: self._refresh_bags,
-            11: self._refresh_urdf,
-            12: self._refresh_tools,
+            6: self._refresh_actions,
+            7: self._refresh_logs,
+            9: self._refresh_params,
+            10: self._refresh_visualizer,
+            11: self._refresh_bags,
+            12: self._refresh_urdf,
+            13: self._refresh_tools,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
@@ -1243,24 +1358,67 @@ class MainWindow(QMainWindow):
         build_card_lay = QVBoxLayout(build_card)
         build_card_lay.setSpacing(14)
 
-        build_btn_row = QHBoxLayout()
-        build_btn_row.setSpacing(10)
+        # Config Row
+        cfg_row = QHBoxLayout()
+        cfg_row.setSpacing(15)
+        
+        cfg_row.addWidget(QLabel("Package:"))
+        self.combo_build_pkg = QComboBox()
+        self.combo_build_pkg.setMinimumWidth(180)
+        cfg_row.addWidget(self.combo_build_pkg)
 
-        btn_build = _action_btn("Colcon Build", "fa5s.cog")
-        btn_build.setToolTip(
-            "<b>Colcon Build</b><br>"
-            "Runs <code>colcon build</code> in the workspace root."
+        self.chk_clean_build = QCheckBox("Clean Build")
+        self.chk_clean_build.setToolTip("Deletes build/, install/, and log/ folders before compiling")
+        cfg_row.addWidget(self.chk_clean_build)
+
+        self.chk_symlink_install = QCheckBox("Symlink Install")
+        self.chk_symlink_install.setToolTip("Uses symbolic links for files instead of copying them (great for Python nodes)")
+        self.chk_symlink_install.setChecked(True)
+        cfg_row.addWidget(self.chk_symlink_install)
+
+        cfg_row.addWidget(QLabel("CMake Args:"))
+        self.txt_cmake_args = QLineEdit()
+        self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
+        cfg_row.addWidget(self.txt_cmake_args)
+
+        build_card_lay.addLayout(cfg_row)
+
+        # Status & Controls Row
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(10)
+
+        self.btn_start_build = _action_btn("Start Build", "fa5s.play")
+        self.btn_start_build.clicked.connect(self._start_colcon_build)
+        ctrl_row.addWidget(self.btn_start_build)
+
+        self.btn_cancel_build = QPushButton("Cancel")
+        self.btn_cancel_build.setEnabled(False)
+        self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
+        ctrl_row.addWidget(self.btn_cancel_build)
+
+        # Status Badge and Timer
+        ctrl_row.addSpacing(20)
+        self.lbl_build_badge = QLabel("Idle")
+        self.lbl_build_badge.setStyleSheet(
+            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
         )
-        btn_build.clicked.connect(self._mock_build)
-        build_btn_row.addWidget(btn_build)
-        build_btn_row.addStretch()
-        build_card_lay.addLayout(build_btn_row)
+        ctrl_row.addWidget(self.lbl_build_badge)
 
-        # Build output label
-        self.lbl_build_status = QLabel("")
-        self.lbl_build_status.setWordWrap(True)
-        self.lbl_build_status.hide()
-        build_card_lay.addWidget(self.lbl_build_status)
+        self.lbl_build_timer = QLabel("Time: 0.0s")
+        ctrl_row.addWidget(self.lbl_build_timer)
+        ctrl_row.addStretch()
+
+        build_card_lay.addLayout(ctrl_row)
+
+        # Console Output
+        self.txt_build_console = QTextEdit()
+        self.txt_build_console.setReadOnly(True)
+        self.txt_build_console.setFixedHeight(220)
+        self.txt_build_console.setPlaceholderText("Build output logs will be streamed here in real-time...")
+        self.txt_build_console.setStyleSheet(
+            "background-color: #1b1b1b; color: #d4d4d4; font-family: monospace; font-size: 11px; border: 1px solid palette(shadow);"
+        )
+        build_card_lay.addWidget(self.txt_build_console)
 
         layout.addWidget(build_card)
         layout.addStretch()
@@ -1674,43 +1832,115 @@ class MainWindow(QMainWindow):
     #  Build logic
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def _mock_build(self):
+    def _start_colcon_build(self):
+        if hasattr(self, "interactive_build_worker") and self.interactive_build_worker.isRunning():
+            return
+
+        self.txt_build_console.clear()
         self.statusBar().showMessage("Running colcon build …")
-        self.lbl_build_status.hide()
 
-        self.progress_dialog = QProgressDialog(
-            "Building workspace with colcon …", "Cancel", 0, 0, self
+        build_args = []
+        
+        # Package selection
+        pkg_selected = self.combo_build_pkg.currentText()
+        if pkg_selected != "All Packages":
+            build_args += ["--packages-select", pkg_selected]
+
+        # Symlink install
+        if self.chk_symlink_install.isChecked():
+            build_args += ["--symlink-install"]
+
+        # Custom CMake args
+        cmake_args = self.txt_cmake_args.text().strip()
+        if cmake_args:
+            import shlex
+            build_args += ["--cmake-args"] + shlex.split(cmake_args)
+
+        clean_first = self.chk_clean_build.isChecked()
+
+        p = ThemeManager.palette()
+        self.lbl_build_badge.setText("Building")
+        self.lbl_build_badge.setStyleSheet(
+            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #d35400; color: white;"
         )
-        self.progress_dialog.setWindowTitle("Building")
-        self.progress_dialog.setWindowModality(Qt.WindowModal)
-        self.progress_dialog.show()
 
-        self.build_thread = BuildThread(
+        self.btn_start_build.setEnabled(False)
+        self.btn_cancel_build.setEnabled(True)
+        self.combo_build_pkg.setEnabled(False)
+        self.chk_clean_build.setEnabled(False)
+        self.chk_symlink_install.setEnabled(False)
+        self.txt_cmake_args.setEnabled(False)
+
+        self.interactive_build_worker = ColconBuildWorker(
             self.current_workspace_path,
             use_wsl=bool(self.cli and self.cli.use_wsl),
+            build_args=build_args,
+            clean_first=clean_first
         )
-        self.build_thread.finished_signal.connect(self._on_build_finished)
-        self.build_thread.start()
+        self.interactive_build_worker.new_line.connect(self._on_build_output_line)
+        self.interactive_build_worker.finished_signal.connect(self._on_interactive_build_finished)
 
-    def _on_build_finished(self, success: bool, output: str):
-        self.progress_dialog.close()
+        self._build_start_time = __import__("time").time()
+        self._interactive_build_timer = QTimer(self)
+        self._interactive_build_timer.setInterval(100)
+        self._interactive_build_timer.timeout.connect(self._update_build_timer)
+        
+        self.interactive_build_worker.start()
+        self._interactive_build_timer.start()
+
+    def _on_build_output_line(self, line: str):
+        self.txt_build_console.append(line.rstrip('\n'))
+
+    def _update_build_timer(self):
+        elapsed = __import__("time").time() - self._build_start_time
+        self.lbl_build_timer.setText(f"Time: {elapsed:.1f}s")
+
+    def _on_interactive_build_finished(self, success: bool, output_err: str):
+        if hasattr(self, "_interactive_build_timer"):
+            self._interactive_build_timer.stop()
+
+        self.btn_start_build.setEnabled(True)
+        self.btn_cancel_build.setEnabled(False)
+        self.combo_build_pkg.setEnabled(True)
+        self.chk_clean_build.setEnabled(True)
+        self.chk_symlink_install.setEnabled(True)
+        self.txt_cmake_args.setEnabled(True)
+
         p = ThemeManager.palette()
         if success:
             self.statusBar().showMessage("Build completed successfully.", 5000)
-            self.lbl_build_status.setStyleSheet(
-                f"color: {p['success']}; font-size: 12px;"
+            self.lbl_build_badge.setText("Succeeded")
+            self.lbl_build_badge.setStyleSheet(
+                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['success']}; color: white;"
             )
-            self.lbl_build_status.setText("✓  Build succeeded.")
-            self.lbl_build_status.show()
+            # Resource workspace
+            self.statusBar().showMessage("Workspace resourced successfully (build complete).", 5000)
+            self._refresh_packages()
+            self._refresh_nodes_list()
+            self._update_build_packages_combo()
         else:
             self.statusBar().showMessage("Build failed.", 5000)
-            self.lbl_build_status.setStyleSheet(
-                f"color: {p['danger']}; font-size: 12px;"
+            self.lbl_build_badge.setText("Failed")
+            self.lbl_build_badge.setStyleSheet(
+                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['danger']}; color: white;"
             )
-            short = output[:400] + ("…" if len(output) > 400 else "")
-            self.lbl_build_status.setText(f"✗  Build failed:\n{short}")
-            self.lbl_build_status.show()
-            QMessageBox.critical(self, "Build Error", f"colcon build failed:\n{output}")
+
+    def _cancel_colcon_build(self):
+        if hasattr(self, "interactive_build_worker") and self.interactive_build_worker.isRunning():
+            self.interactive_build_worker.terminate_process()
+            self.interactive_build_worker.wait(1000)
+            self.txt_build_console.append("\n⚠ Build execution canceled by user.\n")
+            self.statusBar().showMessage("Build canceled.", 5000)
+            
+            self.lbl_build_badge.setText("Canceled")
+            self.lbl_build_badge.setStyleSheet(
+                "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
+            )
+
+    def _refresh_actions(self):
+        if getattr(self, "_action_page", None) is not None:
+            if hasattr(self.action_page, "_refresh_actions"):
+                self.action_page._refresh_actions()
 
     def _auto_build_and_resource(self):
         if hasattr(self, "_bg_build_thread") and self._bg_build_thread.isRunning():
@@ -1744,15 +1974,30 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_pkg_flow"):
             self._refresh_packages()
 
+        self._update_build_packages_combo()
+
         pages_with_set_ws = [
             "_visualizer_page", "_launch_manager_page", "_tools_hub_page",
-            "_topic_inspector_page", "_service_inspector_page", "_parameter_manager_page", "_bag_manager_page",
-            "_urdf_page",
+            "_topic_inspector_page", "_service_inspector_page", "_action_page",
+            "_parameter_manager_page", "_bag_manager_page", "_urdf_page",
         ]
         for attr in pages_with_set_ws:
             page = getattr(self, attr, None)
             if page and hasattr(page, "set_workspace"):
                 page.set_workspace(self.current_workspace_path)
+
+    def _update_build_packages_combo(self):
+        if not hasattr(self, "combo_build_pkg"):
+            return
+        self.combo_build_pkg.blockSignals(True)
+        self.combo_build_pkg.clear()
+        self.combo_build_pkg.addItem("All Packages")
+        
+        workspace = ROS2Workspace(self.current_workspace_path)
+        packages = workspace.get_packages()
+        for pkg in packages:
+            self.combo_build_pkg.addItem(pkg.get("name", ""))
+        self.combo_build_pkg.blockSignals(False)
 
     def _open_workspace(self):
         dir_path = QFileDialog.getExistingDirectory(
@@ -1862,13 +2107,14 @@ class MainWindow(QMainWindow):
             3: "topic_inspector_page",
             4: "launch_manager_page",
             5: "service_inspector_page",
-            6: "log_viewer_page",
-            7: "dds_troubleshooter_page",
-            8: "parameter_manager_page",
-            9: "visualizer_page",
-            10: "bag_manager_page",
-            11: "urdf_page",
-            12: "tools_hub_page",
+            6: "action_page",
+            7: "log_viewer_page",
+            8: "dds_troubleshooter_page",
+            9: "parameter_manager_page",
+            10: "visualizer_page",
+            11: "bag_manager_page",
+            12: "urdf_page",
+            13: "tools_hub_page",
         }
         from PySide6.QtCore import QCoreApplication
         for page_id, attr, _, _, _ in _NAV_ENTRIES:
@@ -1916,6 +2162,15 @@ class MainWindow(QMainWindow):
                         except Exception:
                             pass
             self._launch_manager_page.running_launches.clear()
+
+        # Terminate running build worker if any
+        if hasattr(self, "interactive_build_worker") and self.interactive_build_worker.isRunning():
+            self.interactive_build_worker.terminate_process()
+
+        # Terminate action goal worker if any
+        if getattr(self, "_action_page", None) is not None:
+            if hasattr(self._action_page, "_goal_worker") and self._action_page._goal_worker is not None:
+                self._action_page._cancel_goal()
 
         # Terminate tools hub processes
         if getattr(self, "_tools_hub_page", None) is not None:

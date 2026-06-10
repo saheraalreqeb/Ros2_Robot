@@ -43,6 +43,7 @@ class SettingsPage(QWidget):
         ("topics",         "Topic Inspector",   False),
         ("launch",         "Launch Manager",    False),
         ("services",       "Service Inspector", False),
+        ("actions",        "Action Inspector",  False),
         ("logs",           "Log Viewer",        False),
         ("troubleshooter", "DDS Troubleshooter",False),
         ("params",         "Parameters",        False),
