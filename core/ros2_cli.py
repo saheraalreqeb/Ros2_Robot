@@ -157,11 +157,25 @@ class ROS2CLI:
             'edges': []
         }
         
-        for node in nodes:
+        if not nodes:
+            return topology
+
+        import concurrent.futures
+
+        def get_node_info(node):
             cmd = ['ros2', 'node', 'info', node]
             try:
                 output = self._run_command(cmd)
-            except RuntimeError:
+                return node, output
+            except Exception:
+                return node, ""
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(nodes), 16)) as executor:
+            # Map the helper function over all nodes in parallel threads
+            results = executor.map(get_node_info, nodes)
+
+        for node, output in results:
+            if not output:
                 continue
                 
             current_section = None

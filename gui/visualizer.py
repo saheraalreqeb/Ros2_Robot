@@ -1,14 +1,30 @@
 import subprocess
 import shlex
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QGraphicsView, QGraphicsScene, QLabel
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QThread, Signal
 from PySide6.QtGui import QBrush, QPen, QColor
 from core.ros2_cli import ROS2CLI
+
+class TopologyWorker(QThread):
+    finished_signal = Signal(dict)
+
+    def __init__(self, cli):
+        super().__init__()
+        self.cli = cli
+
+    def run(self):
+        try:
+            topology = self.cli.get_topology()
+            self.finished_signal.emit(topology)
+        except Exception:
+            self.finished_signal.emit({"nodes": [], "topics": [], "edges": []})
+
 
 class VisualizerPage(QWidget):
     def __init__(self, cli: ROS2CLI, parent=None):
         super().__init__(parent)
         self.cli = cli
+        self.worker = None
         
         layout = QVBoxLayout(self)
         
@@ -18,7 +34,6 @@ class VisualizerPage(QWidget):
 
         self.info_label = QLabel("Note: The visualizer only displays Active/Running nodes. If your workspace nodes are not launched, they will not appear here.")
         self.info_label.setStyleSheet("font-style: italic;")
-
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
         
@@ -28,10 +43,29 @@ class VisualizerPage(QWidget):
         layout.addWidget(self.view)
         
     def refresh(self):
+        if self.worker and self.worker.isRunning():
+            return  # Already loading
+            
+        self.refresh_btn.setText("Loading Topology...")
+        self.refresh_btn.setEnabled(False)
         self.scene.clear()
-        topology = self.cli.get_topology()
+        
+        # Show loading text
+        loading_text = self.scene.addText("Querying ROS 2 topology graph in background...")
+        loading_text.setDefaultTextColor(QColor("#8892a4"))
+        
+        self.worker = TopologyWorker(self.cli)
+        self.worker.finished_signal.connect(self._on_topology_loaded)
+        self.worker.start()
+        
+    def _on_topology_loaded(self, topology: dict):
+        self.refresh_btn.setText("Refresh Topology")
+        self.refresh_btn.setEnabled(True)
+        self.scene.clear()
         
         if not topology['nodes'] and not topology['topics']:
+            no_data_text = self.scene.addText("No active nodes or topics found in the network.")
+            no_data_text.setDefaultTextColor(QColor("#8892a4"))
             return
             
         dot_str = "digraph G {\n"
@@ -61,6 +95,8 @@ class VisualizerPage(QWidget):
             self.parse_and_draw(process.stdout)
         except Exception as e:
             print(f"Error running dot: {e}")
+            err_text = self.scene.addText(f"Error rendering Graphviz topology:\n{e}\n\nEnsure 'dot' (Graphviz) is installed.")
+            err_text.setDefaultTextColor(QColor("#ef4444"))
             
     def parse_and_draw(self, plain_output: str):
         from gui.theme import ThemeManager
