@@ -25,6 +25,7 @@ class VisualizerPage(QWidget):
         super().__init__(parent)
         self.cli = cli
         self.worker = None
+        self.last_plain_output = None
         
         layout = QVBoxLayout(self)
         
@@ -92,6 +93,7 @@ class VisualizerPage(QWidget):
                 text=True,
                 check=True
             )
+            self.last_plain_output = process.stdout
             self.parse_and_draw(process.stdout)
         except Exception as e:
             print(f"Error running dot: {e}")
@@ -153,4 +155,6 @@ class VisualizerPage(QWidget):
                     self.scene.addLine(x1, y1, x2, y2, QPen(border_color, 1.5))
                     
     def refresh_theme(self):
-        self.refresh()
+        if self.last_plain_output:
+            self.scene.clear()
+            self.parse_and_draw(self.last_plain_output)

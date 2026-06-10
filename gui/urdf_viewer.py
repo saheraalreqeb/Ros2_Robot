@@ -459,4 +459,5 @@ class URDFViewerPage(QWidget):
             f"QSplitter::handle {{ background-color: {p['border']}; }}"
         )
         self._apply_tabs_style(p)
-        self.scan_workspace()
+        if hasattr(self, "txt_urdf_xml") and self.txt_urdf_xml.toPlainText().strip():
+            self._parse_and_build(self.txt_urdf_xml.toPlainText())
