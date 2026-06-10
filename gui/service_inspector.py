@@ -411,8 +411,19 @@ class ServiceInspectorPage(QWidget):
 
         self.lbl_status.setObjectName("lbl_inspector_status")
         main_win = self.window()
-        if main_win and hasattr(main_win, "topic_inspector_page"):
-            main_win.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+        if main_win and getattr(main_win, "_topic_inspector_page", None) is not None:
+            if hasattr(main_win.topic_inspector_page, "lbl_status"):
+                main_win.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
+
+        # Check discovery cache first
+        if main_win and hasattr(main_win, "discovery_cache"):
+            cached_services = main_win.discovery_cache.get("services", [])
+            if cached_services:
+                self.service_list.clear()
+                self._clear_details()
+                self.lbl_status.setText("")
+                self._on_services_refreshed("\n".join(cached_services))
+                return
 
         self.service_list.clear()
         self._clear_details()

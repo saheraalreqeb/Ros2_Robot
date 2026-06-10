@@ -215,6 +215,13 @@ class ParameterManagerPage(QWidget):
     # ------------------------------------------------------------------
     def _refresh_nodes(self):
         """Run ``ros2 node list`` and populate the combo box."""
+        main_win = self.window()
+        if main_win and hasattr(main_win, "discovery_cache"):
+            cached_nodes = main_win.discovery_cache.get("nodes", [])
+            if cached_nodes:
+                self._on_nodes_refreshed(True, "\n".join(cached_nodes))
+                return
+
         self._set_status("Refreshing node list…")
         cmd = self._build_cmd("ros2 node list")
         worker = _CommandWorker(cmd)

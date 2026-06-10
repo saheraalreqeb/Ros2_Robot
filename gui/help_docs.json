@@ -3,10 +3,11 @@
     "title": "Workspace Manager",
     "icon": "fa5s.folder-open",
     "description": "A Colcon workspace is where you write, build, and modify ROS 2 packages. Sourcing a workspace adjusts system variables so that ROS 2 can find your nodes, libraries, and launch scripts.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Creating-A-Workspace/Creating-A-Workspace.html",
     "under_the_hood": [
       {
         "command": "source /opt/ros/<distro>/setup.bash",
-        "description": "Sources the base ROS 2 distribution system files."
+        "description": "Sources the primary ROS 2 installation to make core CLI tools available."
       },
       {
         "command": "colcon build --symlink-install",
@@ -26,6 +27,7 @@
     "title": "Packages Explorer",
     "icon": "fa5s.box",
     "description": "Explores the ROS 2 packages currently compiled and active in your sourced workspace, displaying their dependencies and version details.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Creating-Your-First-ROS2-Package.html",
     "under_the_hood": [
       {
         "command": "ros2 pkg list",
@@ -45,6 +47,7 @@
     "title": "Nodes Monitor",
     "icon": "fa5s.microchip",
     "description": "Displays all active ROS 2 nodes currently running in the network. A node is a process that performs computation and communicates with other nodes.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Nodes/Understanding-ROS2-Nodes.html",
     "under_the_hood": [
       {
         "command": "ros2 node list",
@@ -64,6 +67,7 @@
     "title": "Topic Inspector",
     "icon": "fa5s.satellite-dish",
     "description": "Inspects active topics in the ROS 2 network. Topics are named buses over which nodes exchange messages via publish/subscribe communication.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Topics/Understanding-ROS2-Topics.html",
     "under_the_hood": [
       {
         "command": "ros2 topic list",
@@ -91,6 +95,7 @@
     "title": "Launch Manager",
     "icon": "fa5s.rocket",
     "description": "Visual builder and executor for ROS 2 launch files. Launch files allow you to start multiple nodes with custom parameters and namespace setups using a single configuration.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Intermediate/Launch/Creating-Launch-Files.html",
     "under_the_hood": [
       {
         "command": "ros2 launch <package> <launch_file>",
@@ -106,6 +111,7 @@
     "title": "Service Inspector",
     "icon": "fa5s.handshake",
     "description": "Lists and calls active services. Services implement a request/response communication pattern, suited for discrete, short-lived actions.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Services/Understanding-ROS2-Services.html",
     "under_the_hood": [
       {
         "command": "ros2 service list",
@@ -144,6 +150,7 @@
     "title": "DDS Troubleshooter",
     "icon": "fa5s.network-wired",
     "description": "Diagnoses connection issues between ROS 2 nodes. ROS 2 relies on DDS (Data Distribution Service) for discovery and network routing.",
+    "documentation_link": "https://docs.ros.org/en/humble/Concepts/Intermediate/About-Different-Middleware-Vendors.html",
     "under_the_hood": [
       {
         "command": "printenv ROS_DOMAIN_ID / ROS_LOCALHOST_ONLY",
@@ -163,6 +170,7 @@
     "title": "Parameters Manager",
     "icon": "fa5s.sliders-h",
     "description": "Inspects and modifies parameters of active nodes. Parameters are node-specific configuration variables (e.g. velocities, thresholds, ports).",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Parameters/Understanding-ROS2-Parameters.html",
     "under_the_hood": [
       {
         "command": "ros2 param list <node>",
@@ -205,6 +213,7 @@
     "title": "Bag Manager",
     "icon": "fa5s.database",
     "description": "Records and plays back ROS 2 bag files. Bags store serialized message data with exact timestamps, allowing you to replay sensor data or logs for offline testing.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Recording-And-Playing-Back-Data/Recording-And-Playing-Back-Data.html",
     "under_the_hood": [
       {
         "command": "ros2 bag record -o <bag_dir> <topics>",
@@ -228,6 +237,7 @@
     "title": "URDF Viewer",
     "icon": "fa5s.cubes",
     "description": "Inspects and visualizes robot model hierarchies defined in URDF (Unified Robot Description Format) or Xacro files.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/URDF-Main.html",
     "under_the_hood": [
       {
         "command": "xacro <file>",
@@ -252,15 +262,6 @@
     "tips": [
       "If a tool shows 'Not found', install it using apt (e.g. sudo apt install ros-<distro>-rviz2).",
       "Sourcing your workspace is sometimes required for tools like RViz2 to discover custom plugins."
-    ]
-  },
-  "settings": {
-    "title": "System Settings",
-    "icon": "fa5s.cog",
-    "description": "Configures UI parameters, toggles themes, and adjusts tab visibility in the sidebar.",
-    "tips": [
-      "Uncheck sidebar tabs that you do not need to declutter the layout.",
-      "Settings are automatically saved locally at ~/.ros2_robot_settings.json."
     ]
   }
 }
