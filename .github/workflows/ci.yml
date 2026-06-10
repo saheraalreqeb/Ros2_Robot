@@ -37,4 +37,4 @@ jobs:
 
       - name: Run E2E Tests (Headless)
         run: |
-          xvfb-run --auto-servernum pytest tests/
+          xvfb-run --auto-servernum python -m pytest tests/
