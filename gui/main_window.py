@@ -622,6 +622,24 @@ class MainWindow(QMainWindow):
         )
         logo_lay.addWidget(logo_txt)
         logo_lay.addStretch()
+
+        # Create help button in logo_lay
+        self.help_btn = QPushButton()
+        self.help_btn.setObjectName("global_help_btn")
+        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
+        self.help_btn.setFixedSize(24, 24)
+        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
+        self.help_btn.clicked.connect(self._show_help_dialog)
+        
+        # Style cleanly with transparent background and theme-colored info icon
+        p = ThemeManager.palette()
+        self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
+        self.help_btn.setStyleSheet(
+            f"QPushButton {{ border: none; background: transparent; }}"
+            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
+        )
+        logo_lay.addWidget(self.help_btn)
+
         sb_lay.addWidget(logo_frame)
         sb_lay.addSpacing(8)
 
@@ -681,22 +699,6 @@ class MainWindow(QMainWindow):
     def _setup_content_area(self):
         self.content_stack = QStackedWidget()
         self.main_layout.addWidget(self.content_stack, 1)
-
-        # Create help button floating directly on self.central_widget
-        self.help_btn = QPushButton(self.central_widget)
-        self.help_btn.setObjectName("global_help_btn")
-        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
-        self.help_btn.setFixedSize(24, 24)
-        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
-        self.help_btn.clicked.connect(self._show_help_dialog)
-        
-        # Style cleanly with transparent background and theme-colored info icon
-        p = ThemeManager.palette()
-        self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
-        self.help_btn.setStyleSheet(
-            f"QPushButton {{ border: none; background: transparent; }}"
-            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
-        )
 
         # Build the pages; page indices must match _NAV_ENTRIES page_id values
         self._workspace_page = None
@@ -1012,12 +1014,6 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "help_btn") and hasattr(self, "content_stack"):
-            geom = self.content_stack.geometry()
-            btn_w = self.help_btn.width()
-            btn_h = self.help_btn.height()
-            self.help_btn.move(geom.right() - btn_w - 40, geom.top() + 40)
-            self.help_btn.raise_()
 
     def _refresh_packages(self):
         """Reload the package cards from the current workspace."""
@@ -1371,44 +1367,27 @@ class MainWindow(QMainWindow):
         self.chk_clean_build.setToolTip("Deletes build/, install/, and log/ folders before compiling")
         cfg_row.addWidget(self.chk_clean_build)
 
-        self.chk_symlink_install = QCheckBox("Symlink Install")
-        self.chk_symlink_install.setToolTip("Uses symbolic links for files instead of copying them (great for Python nodes)")
-        self.chk_symlink_install.setChecked(True)
-        cfg_row.addWidget(self.chk_symlink_install)
-
         cfg_row.addWidget(QLabel("CMake Args:"))
         self.txt_cmake_args = QLineEdit()
         self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
         cfg_row.addWidget(self.txt_cmake_args)
 
-        build_card_lay.addLayout(cfg_row)
-
-        # Status & Controls Row
-        ctrl_row = QHBoxLayout()
-        ctrl_row.setSpacing(10)
-
         self.btn_start_build = _action_btn("Start Build", "fa5s.play")
         self.btn_start_build.clicked.connect(self._start_colcon_build)
-        ctrl_row.addWidget(self.btn_start_build)
+        cfg_row.addWidget(self.btn_start_build)
 
         self.btn_cancel_build = QPushButton("Cancel")
         self.btn_cancel_build.setEnabled(False)
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
-        ctrl_row.addWidget(self.btn_cancel_build)
+        cfg_row.addWidget(self.btn_cancel_build)
 
-        # Status Badge and Timer
-        ctrl_row.addSpacing(20)
         self.lbl_build_badge = QLabel("Idle")
         self.lbl_build_badge.setStyleSheet(
             "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
         )
-        ctrl_row.addWidget(self.lbl_build_badge)
+        cfg_row.addWidget(self.lbl_build_badge)
 
-        self.lbl_build_timer = QLabel("Time: 0.0s")
-        ctrl_row.addWidget(self.lbl_build_timer)
-        ctrl_row.addStretch()
-
-        build_card_lay.addLayout(ctrl_row)
+        build_card_lay.addLayout(cfg_row)
 
         # Console Output
         self.txt_build_console = QTextEdit()
@@ -1846,9 +1825,8 @@ class MainWindow(QMainWindow):
         if pkg_selected != "All Packages":
             build_args += ["--packages-select", pkg_selected]
 
-        # Symlink install
-        if self.chk_symlink_install.isChecked():
-            build_args += ["--symlink-install"]
+        # Symlink install by default
+        build_args += ["--symlink-install"]
 
         # Custom CMake args
         cmake_args = self.txt_cmake_args.text().strip()
@@ -1868,7 +1846,6 @@ class MainWindow(QMainWindow):
         self.btn_cancel_build.setEnabled(True)
         self.combo_build_pkg.setEnabled(False)
         self.chk_clean_build.setEnabled(False)
-        self.chk_symlink_install.setEnabled(False)
         self.txt_cmake_args.setEnabled(False)
 
         self.interactive_build_worker = ColconBuildWorker(
@@ -1879,31 +1856,17 @@ class MainWindow(QMainWindow):
         )
         self.interactive_build_worker.new_line.connect(self._on_build_output_line)
         self.interactive_build_worker.finished_signal.connect(self._on_interactive_build_finished)
-
-        self._build_start_time = __import__("time").time()
-        self._interactive_build_timer = QTimer(self)
-        self._interactive_build_timer.setInterval(100)
-        self._interactive_build_timer.timeout.connect(self._update_build_timer)
         
         self.interactive_build_worker.start()
-        self._interactive_build_timer.start()
 
     def _on_build_output_line(self, line: str):
         self.txt_build_console.append(line.rstrip('\n'))
 
-    def _update_build_timer(self):
-        elapsed = __import__("time").time() - self._build_start_time
-        self.lbl_build_timer.setText(f"Time: {elapsed:.1f}s")
-
     def _on_interactive_build_finished(self, success: bool, output_err: str):
-        if hasattr(self, "_interactive_build_timer"):
-            self._interactive_build_timer.stop()
-
         self.btn_start_build.setEnabled(True)
         self.btn_cancel_build.setEnabled(False)
         self.combo_build_pkg.setEnabled(True)
         self.chk_clean_build.setEnabled(True)
-        self.chk_symlink_install.setEnabled(True)
         self.txt_cmake_args.setEnabled(True)
 
         p = ThemeManager.palette()
