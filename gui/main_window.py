@@ -1363,6 +1363,10 @@ class MainWindow(QMainWindow):
         self.combo_build_pkg.setMinimumWidth(180)
         cfg_row.addWidget(self.combo_build_pkg)
 
+        self.chk_clean_build = QCheckBox("Clean Build")
+        self.chk_clean_build.setToolTip("Deletes build/, install/, and log/ folders before compiling")
+        cfg_row.addWidget(self.chk_clean_build)
+
         cfg_row.addWidget(QLabel("CMake Args:"))
         self.txt_cmake_args = QLineEdit()
         self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
@@ -1376,6 +1380,12 @@ class MainWindow(QMainWindow):
         self.btn_cancel_build.setEnabled(False)
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
         cfg_row.addWidget(self.btn_cancel_build)
+
+        self.lbl_build_badge = QLabel("Idle")
+        self.lbl_build_badge.setStyleSheet(
+            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
+        )
+        cfg_row.addWidget(self.lbl_build_badge)
 
         build_card_lay.addLayout(cfg_row)
 
@@ -1824,11 +1834,18 @@ class MainWindow(QMainWindow):
             import shlex
             build_args += ["--cmake-args"] + shlex.split(cmake_args)
 
-        clean_first = False
+        clean_first = self.chk_clean_build.isChecked()
+
+        p = ThemeManager.palette()
+        self.lbl_build_badge.setText("Building")
+        self.lbl_build_badge.setStyleSheet(
+            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #d35400; color: white;"
+        )
 
         self.btn_start_build.setEnabled(False)
         self.btn_cancel_build.setEnabled(True)
         self.combo_build_pkg.setEnabled(False)
+        self.chk_clean_build.setEnabled(False)
         self.txt_cmake_args.setEnabled(False)
 
         self.interactive_build_worker = ColconBuildWorker(
@@ -1849,10 +1866,16 @@ class MainWindow(QMainWindow):
         self.btn_start_build.setEnabled(True)
         self.btn_cancel_build.setEnabled(False)
         self.combo_build_pkg.setEnabled(True)
+        self.chk_clean_build.setEnabled(True)
         self.txt_cmake_args.setEnabled(True)
 
+        p = ThemeManager.palette()
         if success:
             self.statusBar().showMessage("Build completed successfully.", 5000)
+            self.lbl_build_badge.setText("Succeeded")
+            self.lbl_build_badge.setStyleSheet(
+                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['success']}; color: white;"
+            )
             # Resource workspace
             self.statusBar().showMessage("Workspace resourced successfully (build complete).", 5000)
             self._refresh_packages()
@@ -1860,6 +1883,10 @@ class MainWindow(QMainWindow):
             self._update_build_packages_combo()
         else:
             self.statusBar().showMessage("Build failed.", 5000)
+            self.lbl_build_badge.setText("Failed")
+            self.lbl_build_badge.setStyleSheet(
+                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['danger']}; color: white;"
+            )
 
     def _cancel_colcon_build(self):
         if hasattr(self, "interactive_build_worker") and self.interactive_build_worker.isRunning():
@@ -1867,6 +1894,11 @@ class MainWindow(QMainWindow):
             self.interactive_build_worker.wait(1000)
             self.txt_build_console.append("\n⚠ Build execution canceled by user.\n")
             self.statusBar().showMessage("Build canceled.", 5000)
+            
+            self.lbl_build_badge.setText("Canceled")
+            self.lbl_build_badge.setStyleSheet(
+                "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
+            )
 
     def _refresh_actions(self):
         if getattr(self, "_action_page", None) is not None:
