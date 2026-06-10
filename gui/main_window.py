@@ -1196,36 +1196,17 @@ class MainWindow(QMainWindow):
             # If no layout, just create a layout
             layout = QVBoxLayout(page)
             
-        # Inspect the first item of the layout
-        first_item = layout.itemAt(0)
+        # Create a separate transparent line containing only the info button at the top of all tabs
+        header_lay = QHBoxLayout()
+        header_lay.setContentsMargins(0, 0, 16, 0)
+        header_lay.addStretch()
+        header_lay.addWidget(help_btn)
         
-        # We want to check if the first item is a QHBoxLayout that represents a title header.
-        is_header = False
-        header_lay = None
-        if first_item and first_item.layout() and isinstance(first_item.layout(), QHBoxLayout):
-            # Check if it contains a QLabel (usually the title)
-            header_lay = first_item.layout()
-            for i in range(header_lay.count()):
-                w = header_lay.itemAt(i).widget()
-                if w and isinstance(w, QLabel):
-                    is_header = True
-                    break
-                    
-        if is_header and header_lay is not None:
-            # Add to the far right of the header layout
-            header_lay.addWidget(help_btn)
+        # We insert it at index 0 of the page's root layout
+        if hasattr(layout, "insertLayout"):
+            layout.insertLayout(0, header_lay)
         else:
-            # Create a separate transparent line containing only the info button
-            header_lay = QHBoxLayout()
-            header_lay.setContentsMargins(0, 0, 16, 0)
-            header_lay.addStretch()
-            header_lay.addWidget(help_btn)
-            
-            # We insert it at index 0 of the page's root layout
-            if hasattr(layout, "insertLayout"):
-                layout.insertLayout(0, header_lay)
-            else:
-                layout.addLayout(header_lay)
+            layout.addLayout(header_lay)
 
     def _show_help_dialog_for_page(self, page_id: int):
         import json
