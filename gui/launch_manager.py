@@ -137,12 +137,14 @@ class LaunchManagerPage(QWidget):
 
         # ── Scrollable card area ─────────────────────────────────────────
         scroll = QScrollArea()
+        scroll.setObjectName("launch_scroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
+        scroll.setStyleSheet("#launch_scroll { background: transparent; }")
 
         self._cards_container = QWidget()
-        self._cards_container.setStyleSheet("background: transparent;")
+        self._cards_container.setObjectName("launch_cards_container")
+        self._cards_container.setStyleSheet("#launch_cards_container { background: transparent; }")
         self._cards_layout = FlowLayout(
             self._cards_container, margin=0, hSpacing=20, vSpacing=20
         )

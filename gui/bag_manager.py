@@ -119,12 +119,14 @@ class BagManagerPage(QWidget):
 
         # Scroll area wrapping everything
         scroll = QScrollArea()
+        scroll.setObjectName("bag_main_scroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
+        scroll.setStyleSheet("#bag_main_scroll { background: transparent; }")
 
         container = QWidget()
-        container.setStyleSheet("background: transparent;")
+        container.setObjectName("bag_main_container")
+        container.setStyleSheet("#bag_main_container { background: transparent; }")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setAlignment(Qt.AlignTop)
@@ -339,14 +341,16 @@ class BagManagerPage(QWidget):
 
         # Scrollable container for bag cards
         self.bags_scroll = QScrollArea()
+        self.bags_scroll.setObjectName("bags_scroll")
         self.bags_scroll.setWidgetResizable(True)
         self.bags_scroll.setFrameShape(QFrame.NoFrame)
-        self.bags_scroll.setStyleSheet("background: transparent;")
+        self.bags_scroll.setStyleSheet("#bags_scroll { background: transparent; }")
         self.bags_scroll.setMinimumHeight(100)
         self.bags_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.bags_container = QWidget()
-        self.bags_container.setStyleSheet("background: transparent;")
+        self.bags_container.setObjectName("bags_container")
+        self.bags_container.setStyleSheet("#bags_container { background: transparent; }")
         self.bags_layout = QVBoxLayout(self.bags_container)
         self.bags_layout.setAlignment(Qt.AlignTop)
         self.bags_layout.setSpacing(8)
