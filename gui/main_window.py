@@ -622,6 +622,24 @@ class MainWindow(QMainWindow):
         )
         logo_lay.addWidget(logo_txt)
         logo_lay.addStretch()
+
+        # Create help button in logo_lay
+        self.help_btn = QPushButton()
+        self.help_btn.setObjectName("global_help_btn")
+        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
+        self.help_btn.setFixedSize(24, 24)
+        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
+        self.help_btn.clicked.connect(self._show_help_dialog)
+        
+        # Style cleanly with transparent background and theme-colored info icon
+        p = ThemeManager.palette()
+        self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
+        self.help_btn.setStyleSheet(
+            f"QPushButton {{ border: none; background: transparent; }}"
+            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
+        )
+        logo_lay.addWidget(self.help_btn)
+
         sb_lay.addWidget(logo_frame)
         sb_lay.addSpacing(8)
 
@@ -681,22 +699,6 @@ class MainWindow(QMainWindow):
     def _setup_content_area(self):
         self.content_stack = QStackedWidget()
         self.main_layout.addWidget(self.content_stack, 1)
-
-        # Create help button floating directly on self.central_widget
-        self.help_btn = QPushButton(self.central_widget)
-        self.help_btn.setObjectName("global_help_btn")
-        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
-        self.help_btn.setFixedSize(24, 24)
-        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
-        self.help_btn.clicked.connect(self._show_help_dialog)
-        
-        # Style cleanly with transparent background and theme-colored info icon
-        p = ThemeManager.palette()
-        self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
-        self.help_btn.setStyleSheet(
-            f"QPushButton {{ border: none; background: transparent; }}"
-            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
-        )
 
         # Build the pages; page indices must match _NAV_ENTRIES page_id values
         self._workspace_page = None
@@ -1012,12 +1014,6 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "help_btn") and hasattr(self, "content_stack"):
-            geom = self.content_stack.geometry()
-            btn_w = self.help_btn.width()
-            btn_h = self.help_btn.height()
-            self.help_btn.move(geom.right() - btn_w - 40, geom.top() + 40)
-            self.help_btn.raise_()
 
     def _refresh_packages(self):
         """Reload the package cards from the current workspace."""
