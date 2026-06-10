@@ -237,7 +237,7 @@
     "title": "URDF Viewer",
     "icon": "fa5s.cubes",
     "description": "Inspects and visualizes robot model hierarchies defined in URDF (Unified Robot Description Format) or Xacro files.",
-    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF.html",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/URDF-Main.html",
     "under_the_hood": [
       {
         "command": "xacro <file>",
