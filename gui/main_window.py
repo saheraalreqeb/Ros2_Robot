@@ -512,6 +512,10 @@ class MainWindow(QMainWindow):
         self._setup_content_area()
         self._load_settings()
         self._update_all_workspaces()
+        
+        # Switch to the Workspace page (index 0) immediately so it doesn't render empty
+        self._switch_page(0)
+
         # Register shutdown hook to guarantee settings are saved and threads stopped
         from PySide6.QtWidgets import QApplication
         QApplication.instance().aboutToQuit.connect(self._on_shutdown)
@@ -623,23 +627,6 @@ class MainWindow(QMainWindow):
         logo_lay.addWidget(logo_txt)
         logo_lay.addStretch()
 
-        # Create help button in logo_lay
-        self.help_btn = QPushButton()
-        self.help_btn.setObjectName("global_help_btn")
-        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
-        self.help_btn.setFixedSize(24, 24)
-        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
-        self.help_btn.clicked.connect(self._show_help_dialog)
-        
-        # Style cleanly with transparent background and theme-colored info icon
-        p = ThemeManager.palette()
-        self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
-        self.help_btn.setStyleSheet(
-            f"QPushButton {{ border: none; background: transparent; }}"
-            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
-        )
-        logo_lay.addWidget(self.help_btn)
-
         sb_lay.addWidget(logo_frame)
         sb_lay.addSpacing(8)
 
@@ -740,6 +727,7 @@ class MainWindow(QMainWindow):
             if page_id == 0:
                 page = self._create_workspace_page()
                 self._workspace_page = page
+                self._update_build_packages_combo()
             elif page_id == 1:
                 page = self._create_packages_page()
                 self._packages_page = page
@@ -789,9 +777,16 @@ class MainWindow(QMainWindow):
             if hasattr(page, "refresh_theme"):
                 page.refresh_theme()
 
+            # Attach help button next to page title or on its own transparent line
+            if page_id != 14:
+                self._attach_help_button_to_page(page_id, page)
+
+            is_current = (self.content_stack.currentIndex() == page_id)
             self.content_stack.removeWidget(placeholder)
             placeholder.deleteLater()
             self.content_stack.insertWidget(page_id, page)
+            if is_current:
+                self.content_stack.setCurrentIndex(page_id)
         finally:
             self._instantiating_pages.remove(page_id)
 
@@ -959,8 +954,6 @@ class MainWindow(QMainWindow):
             getattr(self, prop_map[page_id])
 
         self.content_stack.setCurrentIndex(page_id)
-        if hasattr(self, "help_btn"):
-            self.help_btn.setVisible(page_id != 14)
         # Ensure the correct nav button is checked programmatically
         for p_id, attr, _, _, _ in _NAV_ENTRIES:
             btn = self._nav_buttons.get(attr)
@@ -1149,14 +1142,15 @@ class MainWindow(QMainWindow):
         if hasattr(self.settings_page, "_sync_theme_buttons"):
             self.settings_page._sync_theme_buttons()
 
-        # Update help button styling for new theme
-        if hasattr(self, "help_btn"):
+        # Update all local help buttons styling for new theme
+        if hasattr(self, "_local_help_buttons"):
             p = ThemeManager.palette()
-            self.help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
-            self.help_btn.setStyleSheet(
-                f"QPushButton {{ border: none; background: transparent; }}"
-                f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
-            )
+            for btn in self._local_help_buttons.values():
+                btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
+                btn.setStyleSheet(
+                    f"QPushButton {{ border: none; background: transparent; }}"
+                    f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
+                )
             
         self._save_settings()
 
@@ -1173,13 +1167,71 @@ class MainWindow(QMainWindow):
             else:
                 btn.setVisible(vis.get(key, True))
 
-    def _show_help_dialog(self):
-        import json
+    def _attach_help_button_to_page(self, page_id: int, page: QWidget):
+        # Create local help button
+        help_btn = QPushButton()
+        help_btn.setObjectName(f"help_btn_{page_id}")
+        help_btn.setToolTip("Show screen documentation & ROS 2 commands")
+        help_btn.setFixedSize(24, 24)
+        help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
         
-        current_idx = self.content_stack.currentIndex()
+        # Connect to a slot that opens help for this specific page
+        help_btn.clicked.connect(lambda: self._show_help_dialog_for_page(page_id))
+        
+        p = ThemeManager.palette()
+        help_btn.setIcon(ThemeManager.icon("fa5s.info-circle", "normal"))
+        help_btn.setStyleSheet(
+            f"QPushButton {{ border: none; background: transparent; }}"
+            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
+        )
+        
+        # Save reference for theme refresh
+        if not hasattr(self, "_local_help_buttons"):
+            self._local_help_buttons = {}
+        self._local_help_buttons[page_id] = help_btn
+
+        # Try to find root layout of page
+        layout = page.layout()
+        if not layout:
+            # If no layout, just create a layout
+            layout = QVBoxLayout(page)
+            
+        # Inspect the first item of the layout
+        first_item = layout.itemAt(0)
+        
+        # We want to check if the first item is a QHBoxLayout that represents a title header.
+        is_header = False
+        header_lay = None
+        if first_item and first_item.layout() and isinstance(first_item.layout(), QHBoxLayout):
+            # Check if it contains a QLabel (usually the title)
+            header_lay = first_item.layout()
+            for i in range(header_lay.count()):
+                w = header_lay.itemAt(i).widget()
+                if w and isinstance(w, QLabel):
+                    is_header = True
+                    break
+                    
+        if is_header and header_lay is not None:
+            # Add to the far right of the header layout
+            header_lay.addWidget(help_btn)
+        else:
+            # Create a separate transparent line containing only the info button
+            header_lay = QHBoxLayout()
+            header_lay.setContentsMargins(0, 0, 16, 0)
+            header_lay.addStretch()
+            header_lay.addWidget(help_btn)
+            
+            # We insert it at index 0 of the page's root layout
+            if hasattr(layout, "insertLayout"):
+                layout.insertLayout(0, header_lay)
+            else:
+                layout.addLayout(header_lay)
+
+    def _show_help_dialog_for_page(self, page_id: int):
+        import json
         page_key = "unknown"
         for p_id, attr, _, _, _ in _NAV_ENTRIES:
-            if p_id == current_idx:
+            if p_id == page_id:
                 page_key = _TAB_KEY_FOR_BTN.get(attr, "unknown")
                 break
                 
@@ -1201,7 +1253,7 @@ class MainWindow(QMainWindow):
         
         if "icon" not in page_data:
             for p_id, _, _, icon_name, _ in _NAV_ENTRIES:
-                if p_id == current_idx:
+                if p_id == page_id:
                     page_data["icon"] = icon_name
                     break
                     
@@ -1372,22 +1424,29 @@ class MainWindow(QMainWindow):
         self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
         cfg_row.addWidget(self.txt_cmake_args)
 
+        build_card_lay.addLayout(cfg_row)
+
+        # Controls & Status Row
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(15)
+
         self.btn_start_build = _action_btn("Start Build", "fa5s.play")
         self.btn_start_build.clicked.connect(self._start_colcon_build)
-        cfg_row.addWidget(self.btn_start_build)
+        ctrl_row.addWidget(self.btn_start_build)
 
         self.btn_cancel_build = QPushButton("Cancel")
         self.btn_cancel_build.setEnabled(False)
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
-        cfg_row.addWidget(self.btn_cancel_build)
+        ctrl_row.addWidget(self.btn_cancel_build)
 
         self.lbl_build_badge = QLabel("Idle")
         self.lbl_build_badge.setStyleSheet(
             "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
         )
-        cfg_row.addWidget(self.lbl_build_badge)
+        ctrl_row.addWidget(self.lbl_build_badge)
+        ctrl_row.addStretch()
 
-        build_card_lay.addLayout(cfg_row)
+        build_card_lay.addLayout(ctrl_row)
 
         # Console Output
         self.txt_build_console = QTextEdit()
