@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QDialog,
 )
 
 from core.code_generator import CodeGenerator
@@ -161,6 +162,157 @@ _TAB_KEY_FOR_BTN = {
     "btn_tools":          "tools",
     "btn_settings":       "settings",
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  HelpDialog
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class HelpDialog(QDialog):
+    def __init__(self, page_data: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Help: {page_data.get('title', 'Page Help')}")
+        self.setMinimumSize(520, 460)
+        self.resize(580, 500)
+        
+        # Apply theme colors
+        p = ThemeManager.palette()
+        self.setStyleSheet(
+            f"""
+            QDialog {{
+                background-color: {p['bg_card']};
+                color: {p['text_primary']};
+                border: 1px solid {p['border']};
+            }}
+            QLabel {{
+                color: {p['text_primary']};
+            }}
+            QPushButton {{
+                background-color: {p['bg_selected']};
+                color: {p['text_primary']};
+                border: 1px solid {p['border']};
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {p['bg_hover']};
+            }}
+            """
+        )
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Header Row
+        hdr_lay = QHBoxLayout()
+        hdr_lay.setSpacing(12)
+        
+        # Page Icon
+        icon_lbl = QLabel()
+        icon_name = page_data.get("icon", "fa5s.question-circle")
+        icon_lbl.setPixmap(ThemeManager.icon(icon_name, "accent").pixmap(32, 32))
+        hdr_lay.addWidget(icon_lbl)
+        
+        # Title
+        title_lbl = QLabel(page_data.get("title", "Help"))
+        title_lbl.setStyleSheet("font-size: 20px; font-weight: bold;")
+        hdr_lay.addWidget(title_lbl)
+        hdr_lay.addStretch()
+        layout.addLayout(hdr_lay)
+        
+        # Divider
+        div = QFrame()
+        div.setFixedHeight(1)
+        div.setStyleSheet(f"background-color: {p['border']};")
+        layout.addWidget(div)
+        
+        # Scroll area for scrollable contents
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background: transparent;")
+        
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_lay = QVBoxLayout(scroll_content)
+        scroll_lay.setContentsMargins(0, 0, 0, 0)
+        scroll_lay.setSpacing(16)
+        
+        # Description
+        desc_title = QLabel("Overview")
+        desc_title.setStyleSheet("font-size: 13px; font-weight: bold; color: palette(highlight);")
+        scroll_lay.addWidget(desc_title)
+        
+        desc_lbl = QLabel(page_data.get("description", ""))
+        desc_lbl.setWordWrap(True)
+        desc_lbl.setStyleSheet(f"color: {p['text_secondary']}; line-height: 1.4; font-size: 13px;")
+        scroll_lay.addWidget(desc_lbl)
+        
+        # Under the Hood / Background Commands
+        under_hood = page_data.get("under_the_hood", [])
+        if under_hood:
+            cmd_title = QLabel("Under the Hood (ROS 2 CLI & Systems)")
+            cmd_title.setStyleSheet("font-size: 13px; font-weight: bold; color: palette(highlight);")
+            scroll_lay.addWidget(cmd_title)
+            
+            for item in under_hood:
+                cmd_box = QFrame()
+                cmd_box.setStyleSheet(
+                    f"QFrame {{ background-color: {p['bg_hover']}; border: 1px solid {p['border']}; border-radius: 6px; }}"
+                )
+                box_lay = QVBoxLayout(cmd_box)
+                box_lay.setContentsMargins(12, 10, 12, 10)
+                box_lay.setSpacing(4)
+                
+                cmd_lbl = QLabel(f"$ {item.get('command', '')}")
+                cmd_lbl.setStyleSheet(
+                    "font-family: monospace; font-size: 12px; font-weight: bold; color: palette(link);"
+                )
+                cmd_lbl.setWordWrap(True)
+                box_lay.addWidget(cmd_lbl)
+                
+                desc_cmd = QLabel(item.get("description", ""))
+                desc_cmd.setStyleSheet(f"font-size: 11px; color: {p['text_secondary']};")
+                desc_cmd.setWordWrap(True)
+                box_lay.addWidget(desc_cmd)
+                
+                scroll_lay.addWidget(cmd_box)
+                
+        # Tips / Troubleshooting
+        tips = page_data.get("tips", [])
+        if tips:
+            tips_title = QLabel("Tips & Troubleshooting")
+            tips_title.setStyleSheet("font-size: 13px; font-weight: bold; color: palette(highlight);")
+            scroll_lay.addWidget(tips_title)
+            
+            for tip in tips:
+                tip_lay = QHBoxLayout()
+                tip_lay.setSpacing(8)
+                
+                bullet = QLabel("•")
+                bullet.setStyleSheet("font-size: 14px; font-weight: bold; color: palette(highlight);")
+                bullet.setAlignment(Qt.AlignTop)
+                tip_lay.addWidget(bullet)
+                
+                tip_lbl = QLabel(tip)
+                tip_lbl.setWordWrap(True)
+                tip_lbl.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
+                tip_lay.addWidget(tip_lbl, 1)
+                
+                scroll_lay.addLayout(tip_lay)
+                
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll, 1)
+        
+        # Bottom Close Button
+        btn_lay = QHBoxLayout()
+        btn_lay.addStretch()
+        close_btn = QPushButton("Got it")
+        close_btn.clicked.connect(self.accept)
+        btn_lay.addWidget(close_btn)
+        layout.addLayout(btn_lay)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -378,7 +530,41 @@ class MainWindow(QMainWindow):
 
     def _setup_content_area(self):
         self.content_stack = QStackedWidget()
-        self.main_layout.addWidget(self.content_stack, 1)
+
+        # Wrap the stacked widget in a panel with a top bar containing the help button
+        right_panel = QWidget()
+        right_lay = QVBoxLayout(right_panel)
+        right_lay.setContentsMargins(0, 0, 0, 0)
+        right_lay.setSpacing(0)
+
+        # Top bar layout
+        top_bar = QHBoxLayout()
+        top_bar.setContentsMargins(0, 10, 24, 0)
+        top_bar.addStretch()
+
+        self.help_btn = QPushButton()
+        self.help_btn.setObjectName("global_help_btn")
+        self.help_btn.setToolTip("Show screen documentation & ROS 2 commands")
+        self.help_btn.setFixedSize(28, 28)
+        self.help_btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(20, 20))
+        self.help_btn.clicked.connect(self._show_help_dialog)
+        
+        # Style button cleanly
+        p = ThemeManager.palette()
+        self.help_btn.setIcon(ThemeManager.icon("fa5s.question-circle", "normal"))
+        self.help_btn.setStyleSheet(
+            f"QPushButton {{ border: none; background: transparent; }}"
+            f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 14px; }}"
+        )
+        top_bar.addWidget(self.help_btn)
+
+        top_bar_widget = QWidget()
+        top_bar_widget.setLayout(top_bar)
+        
+        right_lay.addWidget(top_bar_widget)
+        right_lay.addWidget(self.content_stack, 1)
+
+        self.main_layout.addWidget(right_panel, 1)
 
         # Build the pages; page indices must match _NAV_ENTRIES page_id values
         self.workspace_page    = self._create_workspace_page()   # 0
@@ -593,6 +779,15 @@ class MainWindow(QMainWindow):
         # Let settings page redraw its own theme buttons and cards
         if hasattr(self.settings_page, "_sync_theme_buttons"):
             self.settings_page._sync_theme_buttons()
+
+        # Update help button styling for new theme
+        if hasattr(self, "help_btn"):
+            p = ThemeManager.palette()
+            self.help_btn.setIcon(ThemeManager.icon("fa5s.question-circle", "normal"))
+            self.help_btn.setStyleSheet(
+                f"QPushButton {{ border: none; background: transparent; }}"
+                f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 14px; }}"
+            )
             
         self._save_settings()
 
@@ -608,8 +803,41 @@ class MainWindow(QMainWindow):
                 btn.setVisible(True)
             else:
                 btn.setVisible(vis.get(key, True))
+
+    def _show_help_dialog(self):
+        import json
+        
+        current_idx = self.content_stack.currentIndex()
+        page_key = "unknown"
+        for p_id, attr, _, _, _ in _NAV_ENTRIES:
+            if p_id == current_idx:
+                page_key = _TAB_KEY_FOR_BTN.get(attr, "unknown")
+                break
                 
-        self._save_settings()
+        docs = {}
+        try:
+            dir_path = os.path.dirname(os.path.abspath(__file__))
+            json_path = os.path.join(dir_path, "help_docs.json")
+            with open(json_path, "r", encoding="utf-8") as f:
+                docs = json.load(f)
+        except Exception as e:
+            print(f"Error loading help docs: {e}")
+            
+        page_data = docs.get(page_key, {
+            "title": "Help",
+            "description": "No documentation available for this tab.",
+            "under_the_hood": [],
+            "tips": []
+        })
+        
+        if "icon" not in page_data:
+            for p_id, _, _, icon_name, _ in _NAV_ENTRIES:
+                if p_id == current_idx:
+                    page_data["icon"] = icon_name
+                    break
+                    
+        dialog = HelpDialog(page_data, self)
+        dialog.exec()
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  Page builders

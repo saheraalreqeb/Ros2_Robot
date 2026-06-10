@@ -1,0 +1,266 @@
+{
+  "workspace": {
+    "title": "Workspace Manager",
+    "icon": "fa5s.folder-open",
+    "description": "A Colcon workspace is where you write, build, and modify ROS 2 packages. Sourcing a workspace adjusts system variables so that ROS 2 can find your nodes, libraries, and launch scripts.",
+    "under_the_hood": [
+      {
+        "command": "source /opt/ros/<distro>/setup.bash",
+        "description": "Sources the base ROS 2 distribution system files."
+      },
+      {
+        "command": "colcon build --symlink-install",
+        "description": "Builds workspace source packages. The --symlink-install flag ensures Python files and assets don't need rebuilding when edited."
+      },
+      {
+        "command": "source install/setup.bash",
+        "description": "Sources the newly compiled workspace packages to make them active."
+      }
+    ],
+    "tips": [
+      "If packages are not appearing, click colcon build and make sure to source the workspace afterward.",
+      "Check that your package directory has a valid package.xml file."
+    ]
+  },
+  "packages": {
+    "title": "Packages Explorer",
+    "icon": "fa5s.box",
+    "description": "Explores the ROS 2 packages currently compiled and active in your sourced workspace, displaying their dependencies and version details.",
+    "under_the_hood": [
+      {
+        "command": "ros2 pkg list",
+        "description": "Queries the active ROS 2 environment paths for all discovered packages."
+      },
+      {
+        "command": "ros2 pkg xml <package>",
+        "description": "Reads and parses the package.xml metadata of the selected package."
+      }
+    ],
+    "tips": [
+      "Only packages in successfully built and sourced directories will appear here.",
+      "Dependencies are defined in your package's package.xml using tags like <depend>."
+    ]
+  },
+  "nodes": {
+    "title": "Nodes Monitor",
+    "icon": "fa5s.microchip",
+    "description": "Displays all active ROS 2 nodes currently running in the network. A node is a process that performs computation and communicates with other nodes.",
+    "under_the_hood": [
+      {
+        "command": "ros2 node list",
+        "description": "Queries the ROS 2 discovery graph for a list of active node names."
+      },
+      {
+        "command": "ros2 node info <node>",
+        "description": "Fetches a node's active publishers, subscribers, services, and actions."
+      }
+    ],
+    "tips": [
+      "Use the Nodes Monitor to inspect the inputs and outputs of individual nodes.",
+      "If a node is hung, you can select its card and click Stop/Kill to force-close its process."
+    ]
+  },
+  "topics": {
+    "title": "Topic Inspector",
+    "icon": "fa5s.satellite-dish",
+    "description": "Inspects active topics in the ROS 2 network. Topics are named buses over which nodes exchange messages via publish/subscribe communication.",
+    "under_the_hood": [
+      {
+        "command": "ros2 topic list",
+        "description": "Retrieves the names of all active topics."
+      },
+      {
+        "command": "ros2 topic info <topic>",
+        "description": "Gets message type, publisher count, and subscriber count for the topic."
+      },
+      {
+        "command": "ros2 topic hz <topic>",
+        "description": "Calculates the average publishing rate (frequency) of messages on the topic."
+      },
+      {
+        "command": "ros2 topic echo <topic>",
+        "description": "Subscribes to the topic and prints received messages in real-time."
+      }
+    ],
+    "tips": [
+      "If no messages appear when echoing, ensure at least one node is active and publishing to that topic.",
+      "Verify that nodes are on the same ROS_DOMAIN_ID to see their topics."
+    ]
+  },
+  "launch": {
+    "title": "Launch Manager",
+    "icon": "fa5s.rocket",
+    "description": "Visual builder and executor for ROS 2 launch files. Launch files allow you to start multiple nodes with custom parameters and namespace setups using a single configuration.",
+    "under_the_hood": [
+      {
+        "command": "ros2 launch <package> <launch_file>",
+        "description": "Executes the selected python or XML launch file under the ROS 2 launch environment."
+      }
+    ],
+    "tips": [
+      "Use the Visual Builder to generate standard .launch.py python files without writing manual XML or Python code.",
+      "Timer blocks are useful to delay node execution until core nodes (like controllers) have booted."
+    ]
+  },
+  "services": {
+    "title": "Service Inspector",
+    "icon": "fa5s.handshake",
+    "description": "Lists and calls active services. Services implement a request/response communication pattern, suited for discrete, short-lived actions.",
+    "under_the_hood": [
+      {
+        "command": "ros2 service list",
+        "description": "Lists all active service names in the ROS 2 network."
+      },
+      {
+        "command": "ros2 service type <service>",
+        "description": "Retrieves the message type name of the service."
+      },
+      {
+        "command": "ros2 service call <service> <type> <args>",
+        "description": "Sends a request with arguments to the service server and prints the response."
+      }
+    ],
+    "tips": [
+      "Service calls are blocking: if the service server doesn't respond, the call will wait. The GUI calls services asynchronously to prevent UI freeze.",
+      "Arguments must be formatted as valid YAML on the input line."
+    ]
+  },
+  "logs": {
+    "title": "Log Viewer",
+    "icon": "fa5s.file-alt",
+    "description": "Displays and filters system and node logs from ~/.ros/log to assist in debugging runtime errors and warning logs.",
+    "under_the_hood": [
+      {
+        "command": "tail -f ~/.ros/log/latest_build/...",
+        "description": "Reads and displays active log files incrementally."
+      }
+    ],
+    "tips": [
+      "Use the Severity level buttons to filter out INFO messages and focus on WARN, ERROR, and FATAL logs.",
+      "Logs are cleared from the view locally but remain saved on disk."
+    ]
+  },
+  "troubleshooter": {
+    "title": "DDS Troubleshooter",
+    "icon": "fa5s.network-wired",
+    "description": "Diagnoses connection issues between ROS 2 nodes. ROS 2 relies on DDS (Data Distribution Service) for discovery and network routing.",
+    "under_the_hood": [
+      {
+        "command": "printenv ROS_DOMAIN_ID / ROS_LOCALHOST_ONLY",
+        "description": "Reads environment configuration settings that restrict or configure discovery multicast."
+      },
+      {
+        "command": "ros2 doctor",
+        "description": "Runs general network diagnostics on the ROS 2 system setup."
+      }
+    ],
+    "tips": [
+      "If nodes cannot see each other, make sure they share the same ROS_DOMAIN_ID.",
+      "Ensure ROS_LOCALHOST_ONLY is set to 0 if nodes are communicating across separate physical computers."
+    ]
+  },
+  "params": {
+    "title": "Parameters Manager",
+    "icon": "fa5s.sliders-h",
+    "description": "Inspects and modifies parameters of active nodes. Parameters are node-specific configuration variables (e.g. velocities, thresholds, ports).",
+    "under_the_hood": [
+      {
+        "command": "ros2 param list <node>",
+        "description": "Lists all parameter names registered by the specified node."
+      },
+      {
+        "command": "ros2 param get <node> <param>",
+        "description": "Retrieves the current value of the parameter."
+      },
+      {
+        "command": "ros2 param set <node> <param> <value>",
+        "description": "Dynamically updates the parameter value of the running node."
+      },
+      {
+        "command": "ros2 param dump <node>",
+        "description": "Saves all current parameter key-values of a node to a YAML file."
+      }
+    ],
+    "tips": [
+      "Some parameters are read-only and cannot be changed after a node starts.",
+      "Use the Dump/Load features to quickly backup and restore configurations."
+    ]
+  },
+  "visualizer": {
+    "title": "Network Visualizer",
+    "icon": "fa5s.project-diagram",
+    "description": "Renders a schematic network graph showing how running nodes and topics are connected to each other.",
+    "under_the_hood": [
+      {
+        "command": "dot -Tplain",
+        "description": "Runs Graphviz layout software to compute node coordinates from a generated DOT syntax string."
+      }
+    ],
+    "tips": [
+      "Ensure that 'graphviz' and its 'dot' tool are installed on your system PATH to render the graph.",
+      "The visualizer only displays active nodes. If your workspace nodes are not launched, they will not appear here."
+    ]
+  },
+  "bags": {
+    "title": "Bag Manager",
+    "icon": "fa5s.database",
+    "description": "Records and plays back ROS 2 bag files. Bags store serialized message data with exact timestamps, allowing you to replay sensor data or logs for offline testing.",
+    "under_the_hood": [
+      {
+        "command": "ros2 bag record -o <bag_dir> <topics>",
+        "description": "Records active message traffic on selected topics into an sqlite3 or mcap bag."
+      },
+      {
+        "command": "ros2 bag play <bag_dir>",
+        "description": "Re-publishes recorded messages onto the network with original timing."
+      },
+      {
+        "command": "ros2 bag info <bag_dir>",
+        "description": "Inspects a bag file to show size, duration, message counts, and topics."
+      }
+    ],
+    "tips": [
+      "When recording, only topics with active publishers will write data to the bag file.",
+      "You can adjust the playback rate (e.g. 2.0x for double speed) or enable loop playback in the options."
+    ]
+  },
+  "urdf": {
+    "title": "URDF Viewer",
+    "icon": "fa5s.cubes",
+    "description": "Inspects and visualizes robot model hierarchies defined in URDF (Unified Robot Description Format) or Xacro files.",
+    "under_the_hood": [
+      {
+        "command": "xacro <file>",
+        "description": "Converts macro-based XML (.xacro) files into raw URDF XML markup for parsing."
+      }
+    ],
+    "tips": [
+      "Verify the kinematic chain links and joints inside the tree view.",
+      "Schematic rendering builds a 2D map of the link connectivity automatically."
+    ]
+  },
+  "tools": {
+    "title": "Tools Hub",
+    "icon": "fa5s.tools",
+    "description": "Central dashboard to check installation status and launch external ROS 2 tools such as RViz2, Foxglove Studio, Gazebo, and PlotJuggler.",
+    "under_the_hood": [
+      {
+        "command": "which <tool>",
+        "description": "Checks the system PATH to see if the tool executable is installed."
+      }
+    ],
+    "tips": [
+      "If a tool shows 'Not found', install it using apt (e.g. sudo apt install ros-<distro>-rviz2).",
+      "Sourcing your workspace is sometimes required for tools like RViz2 to discover custom plugins."
+    ]
+  },
+  "settings": {
+    "title": "System Settings",
+    "icon": "fa5s.cog",
+    "description": "Configures UI parameters, toggles themes, and adjusts tab visibility in the sidebar.",
+    "tips": [
+      "Uncheck sidebar tabs that you do not need to declutter the layout.",
+      "Settings are automatically saved locally at ~/.ros2_robot_settings.json."
+    ]
+  }
+}
