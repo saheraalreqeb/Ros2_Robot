@@ -1,7 +1,7 @@
 #!/bin/bash
-# uninstall.sh — Removes Ros2 Robot from your system
+# uninstall.sh, Removes Ros2 Robot from your system
 
-echo "  Ros2 Robot — Uninstaller"
+echo "  Ros2 Robot, Uninstaller"
 echo "  ════════════════════════════════"
 
 # 1. Remove the local repository folder
@@ -40,6 +40,19 @@ if [ -f "$SETTINGS_FILE" ]; then
     echo "  ✓ Removed"
 else
     echo "  ✓ Settings file not found"
+fi
+
+# 4. Remove the desktop shortcut
+DESKTOP_FILE="$HOME/.local/share/applications/ros2_robot.desktop"
+if [ -f "$DESKTOP_FILE" ]; then
+    echo "➡ Removing desktop shortcut: $DESKTOP_FILE"
+    rm -f "$DESKTOP_FILE"
+    if command -v update-desktop-database &> /dev/null; then
+        update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+    fi
+    echo "  ✓ Removed"
+else
+    echo "  ✓ Desktop shortcut not found"
 fi
 
 echo ""

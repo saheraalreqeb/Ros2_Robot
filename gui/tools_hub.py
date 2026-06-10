@@ -1,7 +1,7 @@
 """
 gui/tools_hub.py
 ================
-Tools Hub page — clean list layout showing ROS2 ecosystem tools,
+Tools Hub page, clean list layout showing ROS2 ecosystem tools,
 their install status, and launch buttons.
 """
 
@@ -354,7 +354,7 @@ class _ToolRow(QFrame):
 # ── Tools Hub page ────────────────────────────────────────────────────────────
 
 class ToolsHubPage(QWidget):
-    """Tools Hub — clean list of ROS2 ecosystem tools."""
+    """Tools Hub, clean list of ROS2 ecosystem tools."""
 
     def __init__(self, cli=None, parent=None):
         super().__init__(parent)

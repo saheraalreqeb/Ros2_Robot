@@ -1,5 +1,5 @@
 """
-Unified Log Viewer Page — consolidate live terminal output and tail ~/.ros/log files.
+Unified Log Viewer Page, consolidate live terminal output and tail ~/.ros/log files.
 """
 
 import os
@@ -278,7 +278,7 @@ class UnifiedLogViewerPage(QWidget):
 
         # Populate Latest Run
         if latest_resolved and os.path.exists(latest_resolved):
-            hdr_item = QListWidgetItem("—— LATEST RUN LOGS ——")
+            hdr_item = QListWidgetItem("- LATEST RUN LOGS -")
             hdr_item.setFlags(Qt.NoItemFlags)
             self.list_sources.addItem(hdr_item)
 
@@ -296,7 +296,7 @@ class UnifiedLogViewerPage(QWidget):
                 continue
 
             if not past_added:
-                hdr_item = QListWidgetItem("—— PAST RUN LOGS ——")
+                hdr_item = QListWidgetItem("- PAST RUN LOGS -")
                 hdr_item.setFlags(Qt.NoItemFlags)
                 self.list_sources.addItem(hdr_item)
                 past_added = True
