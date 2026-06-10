@@ -131,6 +131,30 @@
       "Arguments must be formatted as valid YAML on the input line."
     ]
   },
+  "actions": {
+    "title": "Action Inspector",
+    "icon": "fa5s.bullseye",
+    "description": "Lists and sends goals to active actions. Actions implement feedback-based, long-running goals consisting of three parts: a goal request, feedback updates, and a final result response.",
+    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Actions/Understanding-ROS2-Actions.html",
+    "under_the_hood": [
+      {
+        "command": "ros2 action list -t",
+        "description": "Lists all active action names along with their message types."
+      },
+      {
+        "command": "ros2 action info <action>",
+        "description": "Retrieves the client and server node names connected to the action."
+      },
+      {
+        "command": "ros2 action send_goal <action> <type> <goal>",
+        "description": "Sends a goal payload to the action server and streams feedback and results in real-time."
+      }
+    ],
+    "tips": [
+      "Actions are ideal for long-running robot tasks (e.g. navigating to a waypoint) where you need periodic progress feedback.",
+      "The goal payload must be formatted as a valid YAML structure."
+    ]
+  },
   "logs": {
     "title": "Log Viewer",
     "icon": "fa5s.file-alt",
