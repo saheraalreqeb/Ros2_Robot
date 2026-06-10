@@ -1367,48 +1367,21 @@ class MainWindow(QMainWindow):
         self.combo_build_pkg.setMinimumWidth(180)
         cfg_row.addWidget(self.combo_build_pkg)
 
-        self.chk_clean_build = QCheckBox("Clean Build")
-        self.chk_clean_build.setToolTip("Deletes build/, install/, and log/ folders before compiling")
-        cfg_row.addWidget(self.chk_clean_build)
-
-        self.chk_symlink_install = QCheckBox("Symlink Install")
-        self.chk_symlink_install.setToolTip("Uses symbolic links for files instead of copying them (great for Python nodes)")
-        self.chk_symlink_install.setChecked(True)
-        cfg_row.addWidget(self.chk_symlink_install)
-
         cfg_row.addWidget(QLabel("CMake Args:"))
         self.txt_cmake_args = QLineEdit()
         self.txt_cmake_args.setPlaceholderText("-DCMAKE_BUILD_TYPE=Release")
         cfg_row.addWidget(self.txt_cmake_args)
 
-        build_card_lay.addLayout(cfg_row)
-
-        # Status & Controls Row
-        ctrl_row = QHBoxLayout()
-        ctrl_row.setSpacing(10)
-
         self.btn_start_build = _action_btn("Start Build", "fa5s.play")
         self.btn_start_build.clicked.connect(self._start_colcon_build)
-        ctrl_row.addWidget(self.btn_start_build)
+        cfg_row.addWidget(self.btn_start_build)
 
         self.btn_cancel_build = QPushButton("Cancel")
         self.btn_cancel_build.setEnabled(False)
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
-        ctrl_row.addWidget(self.btn_cancel_build)
+        cfg_row.addWidget(self.btn_cancel_build)
 
-        # Status Badge and Timer
-        ctrl_row.addSpacing(20)
-        self.lbl_build_badge = QLabel("Idle")
-        self.lbl_build_badge.setStyleSheet(
-            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
-        )
-        ctrl_row.addWidget(self.lbl_build_badge)
-
-        self.lbl_build_timer = QLabel("Time: 0.0s")
-        ctrl_row.addWidget(self.lbl_build_timer)
-        ctrl_row.addStretch()
-
-        build_card_lay.addLayout(ctrl_row)
+        build_card_lay.addLayout(cfg_row)
 
         # Console Output
         self.txt_build_console = QTextEdit()
@@ -1846,9 +1819,8 @@ class MainWindow(QMainWindow):
         if pkg_selected != "All Packages":
             build_args += ["--packages-select", pkg_selected]
 
-        # Symlink install
-        if self.chk_symlink_install.isChecked():
-            build_args += ["--symlink-install"]
+        # Symlink install by default
+        build_args += ["--symlink-install"]
 
         # Custom CMake args
         cmake_args = self.txt_cmake_args.text().strip()
@@ -1856,19 +1828,11 @@ class MainWindow(QMainWindow):
             import shlex
             build_args += ["--cmake-args"] + shlex.split(cmake_args)
 
-        clean_first = self.chk_clean_build.isChecked()
-
-        p = ThemeManager.palette()
-        self.lbl_build_badge.setText("Building")
-        self.lbl_build_badge.setStyleSheet(
-            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #d35400; color: white;"
-        )
+        clean_first = False
 
         self.btn_start_build.setEnabled(False)
         self.btn_cancel_build.setEnabled(True)
         self.combo_build_pkg.setEnabled(False)
-        self.chk_clean_build.setEnabled(False)
-        self.chk_symlink_install.setEnabled(False)
         self.txt_cmake_args.setEnabled(False)
 
         self.interactive_build_worker = ColconBuildWorker(
@@ -1879,40 +1843,20 @@ class MainWindow(QMainWindow):
         )
         self.interactive_build_worker.new_line.connect(self._on_build_output_line)
         self.interactive_build_worker.finished_signal.connect(self._on_interactive_build_finished)
-
-        self._build_start_time = __import__("time").time()
-        self._interactive_build_timer = QTimer(self)
-        self._interactive_build_timer.setInterval(100)
-        self._interactive_build_timer.timeout.connect(self._update_build_timer)
         
         self.interactive_build_worker.start()
-        self._interactive_build_timer.start()
 
     def _on_build_output_line(self, line: str):
         self.txt_build_console.append(line.rstrip('\n'))
 
-    def _update_build_timer(self):
-        elapsed = __import__("time").time() - self._build_start_time
-        self.lbl_build_timer.setText(f"Time: {elapsed:.1f}s")
-
     def _on_interactive_build_finished(self, success: bool, output_err: str):
-        if hasattr(self, "_interactive_build_timer"):
-            self._interactive_build_timer.stop()
-
         self.btn_start_build.setEnabled(True)
         self.btn_cancel_build.setEnabled(False)
         self.combo_build_pkg.setEnabled(True)
-        self.chk_clean_build.setEnabled(True)
-        self.chk_symlink_install.setEnabled(True)
         self.txt_cmake_args.setEnabled(True)
 
-        p = ThemeManager.palette()
         if success:
             self.statusBar().showMessage("Build completed successfully.", 5000)
-            self.lbl_build_badge.setText("Succeeded")
-            self.lbl_build_badge.setStyleSheet(
-                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['success']}; color: white;"
-            )
             # Resource workspace
             self.statusBar().showMessage("Workspace resourced successfully (build complete).", 5000)
             self._refresh_packages()
@@ -1920,10 +1864,6 @@ class MainWindow(QMainWindow):
             self._update_build_packages_combo()
         else:
             self.statusBar().showMessage("Build failed.", 5000)
-            self.lbl_build_badge.setText("Failed")
-            self.lbl_build_badge.setStyleSheet(
-                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['danger']}; color: white;"
-            )
 
     def _cancel_colcon_build(self):
         if hasattr(self, "interactive_build_worker") and self.interactive_build_worker.isRunning():
@@ -1931,11 +1871,6 @@ class MainWindow(QMainWindow):
             self.interactive_build_worker.wait(1000)
             self.txt_build_console.append("\n⚠ Build execution canceled by user.\n")
             self.statusBar().showMessage("Build canceled.", 5000)
-            
-            self.lbl_build_badge.setText("Canceled")
-            self.lbl_build_badge.setStyleSheet(
-                "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
-            )
 
     def _refresh_actions(self):
         if getattr(self, "_action_page", None) is not None:
