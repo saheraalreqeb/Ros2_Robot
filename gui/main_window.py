@@ -73,6 +73,34 @@ from gui.urdf_viewer import URDFViewerPage
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
 
+class DiscoveryDaemon(QThread):
+    updated = Signal(dict)
+
+    def __init__(self, cli: ROS2CLI):
+        super().__init__()
+        self.cli = cli
+        self.running = True
+
+    def run(self):
+        import time
+        while self.running:
+            nodes = self.cli.node_list()
+            topics = self.cli.topic_list()
+            services = self.cli.service_list()
+            self.updated.emit({
+                "nodes": nodes,
+                "topics": topics,
+                "services": services
+            })
+            for _ in range(50):
+                if not self.running:
+                    break
+                time.sleep(0.1)
+
+    def stop(self):
+        self.running = False
+
+
 class BuildThread(QThread):
     finished_signal = Signal(bool, str)
 
@@ -365,6 +393,16 @@ class MainWindow(QMainWindow):
         self.running_processes: dict = {}
         self.active_node_cards: list = []
 
+        # Central Discovery Cache and Daemon
+        self.discovery_cache = {
+            "nodes": [],
+            "topics": [],
+            "services": []
+        }
+        self.discovery_daemon = DiscoveryDaemon(self.cli)
+        self.discovery_daemon.updated.connect(self._on_discovery_updated)
+        self.discovery_daemon.start()
+
         # Periodic Resource Monitor Timer
         self.node_monitor_timer = QTimer(self)
         self.node_monitor_timer.setInterval(2000)
@@ -386,9 +424,9 @@ class MainWindow(QMainWindow):
         self._setup_content_area()
         self._load_settings()
         self._update_all_workspaces()
-        # Register shutdown hook to guarantee settings are saved
+        # Register shutdown hook to guarantee settings are saved and threads stopped
         from PySide6.QtWidgets import QApplication
-        QApplication.instance().aboutToQuit.connect(self._save_settings)
+        QApplication.instance().aboutToQuit.connect(self._on_shutdown)
         
         self.statusBar().showMessage("Ready  ·  Ros2 Robot")
 
@@ -452,6 +490,15 @@ class MainWindow(QMainWindow):
         """Called when the user explicitly clicks the Save Settings button."""
         self._save_settings()
         self.statusBar().showMessage("✓ Settings saved successfully!", 3000)
+
+    def _on_discovery_updated(self, data: dict):
+        self.discovery_cache = data
+
+    def _on_shutdown(self):
+        if hasattr(self, "discovery_daemon"):
+            self.discovery_daemon.stop()
+            self.discovery_daemon.wait(2000)
+        self._save_settings()
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -564,45 +611,248 @@ class MainWindow(QMainWindow):
         )
 
         # Build the pages; page indices must match _NAV_ENTRIES page_id values
-        self.workspace_page    = self._create_workspace_page()   # 0
-        self.packages_page     = self._create_packages_page()    # 1
-        self.nodes_page        = self._create_nodes_page()       # 2
-        self.topic_inspector_page = TopicInspectorPage(self.cli) # 3
-        self.launch_manager_page  = LaunchManagerPage(self.cli)  # 4
-        self.service_inspector_page = ServiceInspectorPage(self.cli) # 5
-        self.log_viewer_page      = UnifiedLogViewerPage(self.cli) # 6
-        self.dds_troubleshooter_page = DDSTroubleshooterPage(self.cli) # 7
-        self.parameter_manager_page = ParameterManagerPage(self.cli)  # 8
-        self.visualizer_page   = VisualizerPage(self.cli)        # 9
-        self.bag_manager_page  = BagManagerPage(self.cli)        # 10
-        self.urdf_page         = URDFViewerPage(self.cli)        # 11
-        self.tools_hub_page    = ToolsHubPage(self.cli)          # 12
-        self.settings_page     = self._create_settings_page()   # 13
+        self._workspace_page = None
+        self._packages_page = None
+        self._nodes_page = None
+        self._topic_inspector_page = None
+        self._launch_manager_page = None
+        self._service_inspector_page = None
+        self._log_viewer_page = None
+        self._dds_troubleshooter_page = None
+        self._parameter_manager_page = None
+        self._visualizer_page = None
+        self._bag_manager_page = None
+        self._urdf_page = None
+        self._tools_hub_page = None
+        self.settings_page = self._create_settings_page()   # 13
 
-        # Connect launch logs to unified log viewer
-        self.launch_manager_page.log_emitted.connect(self._on_node_log_received)
+        for i in range(13):
+            placeholder = QWidget()
+            placeholder.setProperty("is_placeholder", True)
+            self.content_stack.addWidget(placeholder)
+        self.content_stack.addWidget(self.settings_page)
 
-        for page in [
-            self.workspace_page,   # 0
-            self.packages_page,    # 1
-            self.nodes_page,       # 2
-            self.topic_inspector_page,  # 3
-            self.launch_manager_page,   # 4
-            self.service_inspector_page, # 5
-            self.log_viewer_page,       # 6
-            self.dds_troubleshooter_page, # 7
-            self.parameter_manager_page,  # 8
-            self.visualizer_page,  # 9
-            self.bag_manager_page, # 10
-            self.urdf_page,        # 11
-            self.tools_hub_page,   # 12
-            self.settings_page,    # 13
-        ]:
-            self.content_stack.addWidget(page)
+    # ── Lazy loading properties ───────────────────────────────────────────────
+
+    def _instantiate_page(self, page_id: int):
+        if getattr(self, "_instantiating_pages", None) is None:
+            self._instantiating_pages = set()
+        if page_id in self._instantiating_pages:
+            return
+        self._instantiating_pages.add(page_id)
+        
+        try:
+            placeholder = self.content_stack.widget(page_id)
+            if not placeholder or not placeholder.property("is_placeholder"):
+                return
+
+            if page_id == 0:
+                page = self._create_workspace_page()
+                self._workspace_page = page
+            elif page_id == 1:
+                page = self._create_packages_page()
+                self._packages_page = page
+            elif page_id == 2:
+                page = self._create_nodes_page()
+                self._nodes_page = page
+            elif page_id == 3:
+                page = TopicInspectorPage(self.cli)
+                self._topic_inspector_page = page
+            elif page_id == 4:
+                page = LaunchManagerPage(self.cli)
+                self._launch_manager_page = page
+                page.log_emitted.connect(self._on_node_log_received)
+            elif page_id == 5:
+                page = ServiceInspectorPage(self.cli)
+                self._service_inspector_page = page
+            elif page_id == 6:
+                page = UnifiedLogViewerPage(self.cli)
+                self._log_viewer_page = page
+            elif page_id == 7:
+                page = DDSTroubleshooterPage(self.cli)
+                self._dds_troubleshooter_page = page
+            elif page_id == 8:
+                page = ParameterManagerPage(self.cli)
+                self._parameter_manager_page = page
+            elif page_id == 9:
+                page = VisualizerPage(self.cli)
+                self._visualizer_page = page
+            elif page_id == 10:
+                page = BagManagerPage(self.cli)
+                self._bag_manager_page = page
+            elif page_id == 11:
+                page = URDFViewerPage(self.cli)
+                self._urdf_page = page
+            elif page_id == 12:
+                page = ToolsHubPage(self.cli)
+                self._tools_hub_page = page
+            else:
+                return
+
+            if hasattr(page, "set_workspace"):
+                page.set_workspace(self.current_workspace_path)
+
+            if hasattr(page, "refresh_theme"):
+                page.refresh_theme()
+
+            self.content_stack.removeWidget(placeholder)
+            placeholder.deleteLater()
+            self.content_stack.insertWidget(page_id, page)
+        finally:
+            self._instantiating_pages.remove(page_id)
+
+    @property
+    def workspace_page(self):
+        if getattr(self, "_workspace_page", None) is None:
+            self._instantiate_page(0)
+        return self._workspace_page
+
+    @workspace_page.setter
+    def workspace_page(self, val):
+        self._workspace_page = val
+
+    @property
+    def packages_page(self):
+        if getattr(self, "_packages_page", None) is None:
+            self._instantiate_page(1)
+        return self._packages_page
+
+    @packages_page.setter
+    def packages_page(self, val):
+        self._packages_page = val
+
+    @property
+    def nodes_page(self):
+        if getattr(self, "_nodes_page", None) is None:
+            self._instantiate_page(2)
+        return self._nodes_page
+
+    @nodes_page.setter
+    def nodes_page(self, val):
+        self._nodes_page = val
+
+    @property
+    def topic_inspector_page(self):
+        if getattr(self, "_topic_inspector_page", None) is None:
+            self._instantiate_page(3)
+        return self._topic_inspector_page
+
+    @topic_inspector_page.setter
+    def topic_inspector_page(self, val):
+        self._topic_inspector_page = val
+
+    @property
+    def launch_manager_page(self):
+        if getattr(self, "_launch_manager_page", None) is None:
+            self._instantiate_page(4)
+        return self._launch_manager_page
+
+    @launch_manager_page.setter
+    def launch_manager_page(self, val):
+        self._launch_manager_page = val
+
+    @property
+    def service_inspector_page(self):
+        if getattr(self, "_service_inspector_page", None) is None:
+            self._instantiate_page(5)
+        return self._service_inspector_page
+
+    @service_inspector_page.setter
+    def service_inspector_page(self, val):
+        self._service_inspector_page = val
+
+    @property
+    def log_viewer_page(self):
+        if getattr(self, "_log_viewer_page", None) is None:
+            self._instantiate_page(6)
+        return self._log_viewer_page
+
+    @log_viewer_page.setter
+    def log_viewer_page(self, val):
+        self._log_viewer_page = val
+
+    @property
+    def dds_troubleshooter_page(self):
+        if getattr(self, "_dds_troubleshooter_page", None) is None:
+            self._instantiate_page(7)
+        return self._dds_troubleshooter_page
+
+    @dds_troubleshooter_page.setter
+    def dds_troubleshooter_page(self, val):
+        self._dds_troubleshooter_page = val
+
+    @property
+    def parameter_manager_page(self):
+        if getattr(self, "_parameter_manager_page", None) is None:
+            self._instantiate_page(8)
+        return self._parameter_manager_page
+
+    @parameter_manager_page.setter
+    def parameter_manager_page(self, val):
+        self._parameter_manager_page = val
+
+    @property
+    def visualizer_page(self):
+        if getattr(self, "_visualizer_page", None) is None:
+            self._instantiate_page(9)
+        return self._visualizer_page
+
+    @visualizer_page.setter
+    def visualizer_page(self, val):
+        self._visualizer_page = val
+
+    @property
+    def bag_manager_page(self):
+        if getattr(self, "_bag_manager_page", None) is None:
+            self._instantiate_page(10)
+        return self._bag_manager_page
+
+    @bag_manager_page.setter
+    def bag_manager_page(self, val):
+        self._bag_manager_page = val
+
+    @property
+    def urdf_page(self):
+        if getattr(self, "_urdf_page", None) is None:
+            self._instantiate_page(11)
+        return self._urdf_page
+
+    @urdf_page.setter
+    def urdf_page(self, val):
+        self._urdf_page = val
+
+    @property
+    def tools_hub_page(self):
+        if getattr(self, "_tools_hub_page", None) is None:
+            self._instantiate_page(12)
+        return self._tools_hub_page
+
+    @tools_hub_page.setter
+    def tools_hub_page(self, val):
+        self._tools_hub_page = val
 
     # ── Page switching ────────────────────────────────────────────────────────
 
     def _switch_page(self, page_id: int):
+        # Force lazy instantiation if needed
+        prop_map = {
+            0: "workspace_page",
+            1: "packages_page",
+            2: "nodes_page",
+            3: "topic_inspector_page",
+            4: "launch_manager_page",
+            5: "service_inspector_page",
+            6: "log_viewer_page",
+            7: "dds_troubleshooter_page",
+            8: "parameter_manager_page",
+            9: "visualizer_page",
+            10: "bag_manager_page",
+            11: "urdf_page",
+            12: "tools_hub_page",
+        }
+        if page_id in prop_map:
+            getattr(self, prop_map[page_id])
+
         self.content_stack.setCurrentIndex(page_id)
         if hasattr(self, "help_btn"):
             self.help_btn.setVisible(page_id != 13)
@@ -616,14 +866,14 @@ class MainWindow(QMainWindow):
 
         # Handle status label objectName toggling to prevent collision
         if page_id == 3: # Topic Inspector
-            if hasattr(self, "service_inspector_page") and hasattr(self.service_inspector_page, "lbl_status"):
+            if getattr(self, "_service_inspector_page", None) is not None and hasattr(self.service_inspector_page, "lbl_status"):
                 self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
-            if hasattr(self, "topic_inspector_page") and hasattr(self.topic_inspector_page, "lbl_status"):
+            if getattr(self, "_topic_inspector_page", None) is not None and hasattr(self.topic_inspector_page, "lbl_status"):
                 self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
         elif page_id == 5: # Service Inspector
-            if hasattr(self, "topic_inspector_page") and hasattr(self.topic_inspector_page, "lbl_status"):
+            if getattr(self, "_topic_inspector_page", None) is not None and hasattr(self.topic_inspector_page, "lbl_status"):
                 self.topic_inspector_page.lbl_status.setObjectName("lbl_inspector_status_inactive")
-            if hasattr(self, "service_inspector_page") and hasattr(self.service_inspector_page, "lbl_status"):
+            if getattr(self, "_service_inspector_page", None) is not None and hasattr(self.service_inspector_page, "lbl_status"):
                 self.service_inspector_page.lbl_status.setObjectName("lbl_inspector_status")
 
         # Trigger data refresh
@@ -1495,9 +1745,9 @@ class MainWindow(QMainWindow):
             self._refresh_packages()
 
         pages_with_set_ws = [
-            "visualizer_page", "launch_manager_page", "tools_hub_page",
-            "topic_inspector_page", "service_inspector_page", "parameter_manager_page", "bag_manager_page",
-            "urdf_page",
+            "_visualizer_page", "_launch_manager_page", "_tools_hub_page",
+            "_topic_inspector_page", "_service_inspector_page", "_parameter_manager_page", "_bag_manager_page",
+            "_urdf_page",
         ]
         for attr in pages_with_set_ws:
             page = getattr(self, attr, None)
@@ -1619,9 +1869,9 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self._save_settings()
         # Terminate running launches
-        if hasattr(self, "launch_manager_page"):
+        if getattr(self, "_launch_manager_page", None) is not None:
             for _path, proc in list(
-                getattr(self.launch_manager_page, "running_launches", {}).items()
+                getattr(self._launch_manager_page, "running_launches", {}).items()
             ):
                 is_running = False
                 if proc is not None and hasattr(proc, "poll"):
@@ -1639,13 +1889,13 @@ class MainWindow(QMainWindow):
                             proc.kill()
                         except Exception:
                             pass
-            self.launch_manager_page.running_launches.clear()
+            self._launch_manager_page.running_launches.clear()
 
         # Terminate tools hub processes
-        if hasattr(self, "tools_hub_page"):
-            cards = getattr(self.tools_hub_page, "_cards", {})
+        if getattr(self, "_tools_hub_page", None) is not None:
+            cards = getattr(self._tools_hub_page, "_cards", {})
             if not cards:
-                cards = getattr(self.tools_hub_page, "_rows", {})
+                cards = getattr(self._tools_hub_page, "_rows", {})
             for card in cards.values():
                 p = getattr(card, "_process", None)
                 is_running = False

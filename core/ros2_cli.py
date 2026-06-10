@@ -219,3 +219,17 @@ class ROS2CLI:
                         
         topology['topics'] = list(topology['topics'])
         return topology
+
+    def service_list(self) -> List[str]:
+        """
+        List active ROS2 services.
+        
+        Returns:
+            List[str]: List of active service names.
+        """
+        cmd = ['ros2', 'service', 'list']
+        try:
+            output = self._run_command(cmd)
+            return [line.strip() for line in output.split('\n') if line.strip()]
+        except RuntimeError:
+            return []
