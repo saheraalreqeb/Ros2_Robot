@@ -82,11 +82,16 @@ echo "        ✓  Qt platform dependencies"
 
 # ── 2. Python dependencies ─────────────────────────────────────────────────
 echo "[ 2/5 ] Installing Python dependencies..."
-if ! command -v pip3 &> /dev/null || ! python3 -m venv --help &> /dev/null; then
-    echo "Required Python packages (pip/venv) are missing >>> installing them..."
+if ! command -v pip3 &> /dev/null || ! python3 -c "import ensurepip" &>/dev/null; then
+    echo "Required Python packages (pip/venv) are missing or incomplete. Installing..."
     if command -v apt-get &> /dev/null; then
+        PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "")
+        VENV_PKGS="python3-venv"
+        if [ -n "$PYTHON_VERSION" ]; then
+            VENV_PKGS="python3-venv python${PYTHON_VERSION}-venv"
+        fi
         $SUDO apt-get update -q 2>/dev/null || true
-        $SUDO apt-get install -y -q python3-pip python3-venv 2>/dev/null
+        $SUDO apt-get install -y -q python3-pip $VENV_PKGS 2>/dev/null
     elif command -v dnf &> /dev/null; then
         $SUDO dnf install -y python3-pip 2>/dev/null || true
     elif command -v pacman &> /dev/null; then
@@ -95,8 +100,9 @@ if ! command -v pip3 &> /dev/null || ! python3 -m venv --help &> /dev/null; then
 fi
 
 VENV_DIR="$REPO_DIR/.venv"
-if [ ! -d "$VENV_DIR" ]; then
+if [ ! -d "$VENV_DIR" ] || [ ! -f "$VENV_DIR/bin/python" ] || [ ! -f "$VENV_DIR/bin/pip" ]; then
     echo "Creating transparent Python virtual environment..."
+    rm -rf "$VENV_DIR"
     python3 -m venv --system-site-packages "$VENV_DIR"
 fi
 
