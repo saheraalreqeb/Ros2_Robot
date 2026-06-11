@@ -160,6 +160,8 @@ class ColconBuildWorker(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=run_cwd,
                 bufsize=1
             )
@@ -207,11 +209,11 @@ class BuildThread(QThread):
                 cmd = ["wsl", "bash", "-i", "-c",
                        f'cd "{ws_wsl}" && colcon build']
                 result = subprocess.run(
-                    cmd, capture_output=True, text=True
+                    cmd, capture_output=True, text=True, encoding="utf-8", errors="replace"
                 )
             else:
                 result = subprocess.run(
-                    "colcon build", capture_output=True, text=True,
+                    "colcon build", capture_output=True, text=True, encoding="utf-8", errors="replace",
                     shell=True, cwd=self.workspace_path
                 )
             if result.returncode == 0:
@@ -1780,6 +1782,8 @@ class MainWindow(QMainWindow):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             self.running_processes[proc_key] = proc
             btn.setText("  Stop")

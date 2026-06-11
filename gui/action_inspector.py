@@ -23,7 +23,7 @@ class _ActionListWorker(QThread):
     def run(self):
         try:
             result = subprocess.run(
-                self.cmd, capture_output=True, text=True, timeout=10
+                self.cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             if result.returncode == 0:
                 self.result_ready.emit(result.stdout.strip())
@@ -42,7 +42,7 @@ class _ActionInfoWorker(QThread):
     def run(self):
         try:
             result = subprocess.run(
-                self.cmd, capture_output=True, text=True, timeout=10
+                self.cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             self.result_ready.emit(result.stdout.strip())
         except Exception as exc:
@@ -65,6 +65,8 @@ class _GoalSenderWorker(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=self.cwd,
                 bufsize=1
             )

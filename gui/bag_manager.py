@@ -64,7 +64,7 @@ class _BagWorker(QThread):
         try:
             import core.ros2_cli
             result = core.ros2_cli.subprocess.run(
-                self.cmd, capture_output=True, text=True, timeout=10
+                self.cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             if result.returncode == 0:
                 self.finished.emit(True, result.stdout.strip())
@@ -558,7 +558,7 @@ class BagManagerPage(QWidget):
             prefix = _source_prefix(self.workspace_path)
             result = core.ros2_cli.subprocess.run(
                 ["bash", "-c", f'{prefix}ros2 bag info "{path}"'],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
             )
             if result.returncode == 0:
                 self.txt_bag_info.setPlainText(result.stdout.strip())
