@@ -80,6 +80,8 @@ class HzMeasureThread(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             # Let it accumulate samples
             self.msleep(int(self.duration_sec * 1000))
@@ -113,7 +115,7 @@ class _TopicListWorker(QThread):
         try:
             import core.ros2_cli
             result = core.ros2_cli.subprocess.run(
-                self.cmd, capture_output=True, text=True, timeout=10
+                self.cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             if result.returncode == 0:
                 self.result_ready.emit(result.stdout.strip())
@@ -133,7 +135,7 @@ class _TopicInfoWorker(QThread):
         try:
             import core.ros2_cli
             result = core.ros2_cli.subprocess.run(
-                self.cmd, capture_output=True, text=True, timeout=10
+                self.cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             self.result_ready.emit(result.stdout.strip())
         except Exception as exc:
@@ -473,7 +475,7 @@ class TopicInspectorPage(QWidget):
         cmd = self._build_cmd(ros2_args)
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=10
+                cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             return result.stdout.strip()
         except Exception as exc:
@@ -909,6 +911,8 @@ class TopicInspectorPage(QWidget):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
 
         self._echo_thread = EchoReaderThread(self._echo_process, parent=self)

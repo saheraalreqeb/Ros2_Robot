@@ -356,6 +356,8 @@ class LaunchManagerPage(QWidget):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             self.running_launches[key] = proc
             btn.setText("Stop")

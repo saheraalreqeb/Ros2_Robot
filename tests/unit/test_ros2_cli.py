@@ -23,6 +23,8 @@ def test_ros2_cli_run_command_native(mocker):
         cwd=None,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True
     )
 
