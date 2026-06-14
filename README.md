@@ -67,7 +67,7 @@ bash install.sh
 ---
 
 ### What the installer does automatically:
-- Installs the system dependency for Qt (`libxcb-cursor0`)
+- Installs system Qt/OpenGL dependencies (`libxcb-cursor0`, `libxcb-xinerama0`, `libxkbcommon-x11-0`, `libgl1`, `libegl1`, `libglib2.0-0`)
 - Installs all Python dependencies (`PySide6`, `psutil`, `PyYAML`, `qtawesome`)
 - Creates a permanent `ros2_robot` command symlink in `~/.local/bin` (no `sudo` required for this step)
 - Ensures `~/.local/bin` is added to your shell's `PATH`
@@ -152,6 +152,7 @@ Once inside the container, run the `install.sh` script or launch `ros2_robot` di
 | **Action Inspector** | Browse all active actions, view details, and send goals interactively with live progress feedback. |
 | **Parameters** | Read and set node parameters. Dump/load YAML parameter files. |
 | **Bag Manager** | Record and replay ROS 2 bag files with loop and rate controls. |
+| **URDF Viewer** | Load and inspect `.urdf` / `.xacro` robot description files. Interactive 3D viewport with orbit/pan/zoom, per-joint sliders for live joint-angle control, kinematic hierarchy tree, and 2D kinematic graph. |
 | **Settings** | Switch between **Dark** and **Light** themes. Show/hide sidebar tabs. |
 
 ---
@@ -235,6 +236,7 @@ Ros2_Robot/
     ├── action_inspector.py  # Action browser & goal sender
     ├── parameter_manager.py # Node parameter editor
     ├── bag_manager.py       # Bag record & playback
+    ├── urdf_viewer.py       # 3D URDF/Xacro viewer with joint controls
     └── visualizer.py        # Network graph
 ```
 

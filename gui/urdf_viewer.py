@@ -19,15 +19,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import (
-    QColor, QFont, QPen, QBrush, QMatrix4x4, QVector3D, QPainter,
-    QLinearGradient, QRadialGradient
+    QColor, QFont, QPen, QBrush, QPainter,
+    QRadialGradient
 )
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import (
     QAbstractItemView, QDoubleSpinBox, QFrame, QGraphicsScene,
     QGraphicsView, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QPlainTextEdit, QPushButton, QScrollArea,
-    QSizePolicy, QSlider, QSplitter, QTabWidget, QTreeWidget,
+    QListWidgetItem, QPushButton, QScrollArea,
+    QSlider, QSplitter, QTabWidget, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget
 )
 
@@ -569,6 +569,7 @@ class URDFViewerPage(QWidget):
         self._rebuild_joint_panel()
         if self.links:
             self._refresh_diagram()
+            self._build_tree()
 
     # ── UI construction ─────────────────────────────────────────────────────────
 
@@ -711,20 +712,13 @@ class URDFViewerPage(QWidget):
         self.tabs_urdf.setObjectName("tabs_urdf")
         self._apply_tabs_style(p)
 
-        # Tab 1: XML view
-        self.txt_urdf_xml = QPlainTextEdit()
-        self.txt_urdf_xml.setObjectName("txt_urdf_xml")
-        self.txt_urdf_xml.setReadOnly(True)
-        self.txt_urdf_xml.setFont(QFont("Consolas", 10))
-        self.tabs_urdf.addTab(self.txt_urdf_xml, "XML Code")
-
-        # Tab 2: Hierarchy Tree
+        # Tab 1: Hierarchy Tree
         self.tree_urdf_hierarchy = QTreeWidget()
         self.tree_urdf_hierarchy.setObjectName("tree_urdf_hierarchy")
         self.tree_urdf_hierarchy.setHeaderLabels(["Kinematic Tree"])
         self.tabs_urdf.addTab(self.tree_urdf_hierarchy, "Hierarchy")
 
-        # Tab 3: Kinematic Diagram (2-D overview)
+        # Tab 2: Kinematic Diagram (2-D overview)
         self.view_urdf_diagram = QGraphicsView()
         self.view_urdf_diagram.setObjectName("view_urdf_diagram")
         self.view_urdf_diagram.setRenderHint(QPainter.Antialiasing)
@@ -805,9 +799,7 @@ class URDFViewerPage(QWidget):
         if self.list_urdf_files.count() > 0:
             self.list_urdf_files.setCurrentRow(0)
         else:
-            p = ThemeManager.palette()
             self.lbl_active.setText("No URDF/Xacro files found")
-            self.txt_urdf_xml.clear()
             self.tree_urdf_hierarchy.clear()
             self.scene_urdf.clear()
             self.viewport3d.clear()
@@ -829,8 +821,6 @@ class URDFViewerPage(QWidget):
                 raw_content = f.read()
         except Exception as exc:
             raw_content = f"Error reading file:\n{exc}"
-
-        self.txt_urdf_xml.setPlainText(raw_content)
 
         # Resolve xacro if possible
         parsed_xml = raw_content
@@ -854,7 +844,7 @@ class URDFViewerPage(QWidget):
         self.tree_urdf_hierarchy.clear()
         self.scene_urdf.clear()
 
-        if not xml_content.strip():
+        if not xml_content.strip() or "Error reading file" in xml_content:
             self.viewport3d.clear()
             return
 
