@@ -1071,7 +1071,6 @@ class URDFViewerPage(QWidget):
         self.all_files: List[Tuple[str, str, str]] = []
 
         self._build_ui()
-        self.scan_workspace()
 
     # ── public ──────────────────────────────────────────────────────────────
 
@@ -1294,9 +1293,7 @@ class URDFViewerPage(QWidget):
                 it.setToolTip(rel)
                 it.setData(Qt.UserRole, fp)
                 self.list_urdf_files.addItem(it)
-        if self.list_urdf_files.count() > 0:
-            self.list_urdf_files.setCurrentRow(0)
-        else:
+        if self.list_urdf_files.count() == 0:
             self.lbl_active.setText("No URDF/Xacro files found")
             self.tree_urdf_hierarchy.clear()
             self.scene_urdf.clear()
