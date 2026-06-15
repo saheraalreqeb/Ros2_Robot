@@ -27,7 +27,6 @@ TOOLS = [
         "description": "3D visualisation for sensor data, robot models & TF frames.",
         "package":     "ros-{distro}-rviz2",
         "icon":        "fa5s.cube",
-        "accent":      "#6366f1",   # indigo
     },
     {
         "name":        "Gazebo",
@@ -37,7 +36,6 @@ TOOLS = [
         "description": "Physics-based robot simulator with sensor and world support.",
         "package":     "ros-{distro}-ros-gz",
         "icon":        "fa5s.globe",
-        "accent":      "#f59e0b",   # amber
     },
     {
         "name":        "rqt",
@@ -45,7 +43,6 @@ TOOLS = [
         "description": "Plugin-based GUI framework for ROS2 introspection tools.",
         "package":     "ros-{distro}-rqt",
         "icon":        "fa5s.th-large",
-        "accent":      "#3b82f6",   # blue
     },
     {
         "name":        "rqt_graph",
@@ -53,7 +50,6 @@ TOOLS = [
         "description": "Visualise the ROS2 computation graph of nodes and topics.",
         "package":     "ros-{distro}-rqt-graph",
         "icon":        "fa5s.project-diagram",
-        "accent":      "#8b5cf6",   # purple
     },
     {
         "name":        "PlotJuggler",
@@ -64,7 +60,6 @@ TOOLS = [
         "description": "Advanced time-series data visualisation and analysis tool.",
         "package":     "ros-{distro}-plotjuggler-ros",
         "icon":        "fa5s.chart-area",
-        "accent":      "#10b981",   # emerald
     },
 ]
 
@@ -115,16 +110,16 @@ class _ToolRow(QFrame):
         icon_frame = QFrame()
         icon_frame.setFixedSize(44, 44)
         icon_frame.setStyleSheet(
-            f"background-color: {tool_info['accent']}22;"
-            f"border: 1px solid {tool_info['accent']}55;"
-            f"border-radius: 10px;"
+            "background-color: palette(window);"
+            "border: 1px solid palette(shadow);"
+            "border-radius: 12px;"
         )
         icon_lay = QVBoxLayout(icon_frame)
         icon_lay.setContentsMargins(0, 0, 0, 0)
         icon_lay.setAlignment(Qt.AlignCenter)
         try:
             icon_lbl = QLabel()
-            pix = qta.icon(tool_info["icon"], color=tool_info["accent"]).pixmap(20, 20)
+            pix = qta.icon(tool_info["icon"], color=ThemeManager.palette()["accent"]).pixmap(20, 20)
             icon_lbl.setPixmap(pix)
             icon_lbl.setAlignment(Qt.AlignCenter)
         except Exception:
@@ -158,7 +153,7 @@ class _ToolRow(QFrame):
         self._status_lbl.setAlignment(Qt.AlignRight)
         self._status_lbl.setStyleSheet(
             "font-size: 11px; font-weight: 600; padding: 2px 8px;"
-            "border-radius: 10px; background: transparent;"
+            "border-radius: 12px; background: transparent;"
         )
         right_col.addWidget(self._status_lbl)
 
@@ -176,42 +171,18 @@ class _ToolRow(QFrame):
         self._btn = QPushButton(f"  Launch {tool_info['name']}")
         try:
             self._btn.setIcon(qta.icon("fa5s.external-link-alt",
-                                       color=ThemeManager.palette()["bg_main"]))
+                                       color=ThemeManager.palette()["text"]))
         except Exception:
             pass
         self._btn.setFixedWidth(145)
         self._btn.setFixedHeight(32)
-        self._btn.setStyleSheet(self._btn_style())
         self._btn.clicked.connect(self._on_launch)
         btn_row.addWidget(self._btn)
 
         right_col.addLayout(btn_row)
         lay.addLayout(right_col)
 
-    # ── Style helpers ─────────────────────────────────────────────────────
-
-    def _btn_style(self) -> str:
-        p = ThemeManager.palette()
-        if self._installed:
-            return (
-                f"QPushButton {{ background-color: {self._tool['accent']};"
-                f" color: #ffffff; border: none; border-radius: 6px;"
-                f" font-size: 12px; font-weight: 600; padding: 0 12px; }}"
-                f"QPushButton:hover {{ background-color: {self._tool['accent']}cc; }}"
-                f"QPushButton:pressed {{ background-color: {self._tool['accent']}99; }}"
-                f"QPushButton:disabled {{ background-color: {p['bg_card']};"
-                f" color: {p['border']}; }}"
-            )
-        else:
-            return (
-                f"QPushButton {{ background-color: transparent;"
-                f" color: {self._tool['accent']}; border: 1px solid {self._tool['accent']};"
-                f" border-radius: 6px; font-size: 12px; font-weight: 600; padding: 0 12px; }}"
-                f"QPushButton:hover {{ background-color: {self._tool['accent']}18; }}"
-                f"QPushButton:pressed {{ background-color: {self._tool['accent']}33; }}"
-                f"QPushButton:disabled {{ background-color: {p['bg_card']};"
-                f" color: {p['border']}; }}"
-            )
+    # ── State updates ─────────────────────────────────────────────────────
 
     def set_installed(self, installed: bool):
         self._installed = installed
@@ -225,11 +196,10 @@ class _ToolRow(QFrame):
             )
             self._btn.setText(f"  Launch {self._tool['name']}")
             try:
-                self._btn.setIcon(qta.icon("fa5s.external-link-alt", color="#ffffff"))
+                self._btn.setIcon(qta.icon("fa5s.external-link-alt", color=p["text"]))
             except Exception:
                 pass
             self._btn.setEnabled(True)
-            self._btn.setStyleSheet(self._btn_style())
 
             # Dynamically update command label to show the resolved executable
             resolved_cmd = self._tool["command"]
@@ -246,13 +216,12 @@ class _ToolRow(QFrame):
                 f"border-radius: 10px; color: {p['danger']};"
                 f"background: {p['danger']}18; border: 1px solid {p['danger']}3f;"
             )
-            self._btn.setText(f"  Launch {self._tool['name']}")
+            self._btn.setText("  Install Required")
             try:
-                self._btn.setIcon(qta.icon("fa5s.download", color=self._tool["accent"]))
+                self._btn.setIcon(qta.icon("fa5s.download", color=p["text"]))
             except Exception:
                 pass
             self._btn.setEnabled(True)
-            self._btn.setStyleSheet(self._btn_style())
 
     def _on_launch(self):
         import sys
@@ -437,7 +406,6 @@ class ToolsHubPage(QWidget):
     def refresh_theme(self):
         for row in self._rows.values():
             row.set_installed(row._installed)
-            row._btn.setStyleSheet(row._btn_style())
 
     # ── Install check ─────────────────────────────────────────────────────
 

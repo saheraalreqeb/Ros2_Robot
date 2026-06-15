@@ -16,16 +16,23 @@ import qtawesome as qta
 THEMES: dict[str, dict] = {
     "dark": {
         # backgrounds
-        "bg_main":      "#0d0f14",
-        "bg_sidebar":   "#111318",
-        "bg_card":      "#161a24",
-        "bg_input":     "#1c2130",
-        "bg_hover":     "#1e2435",
-        "bg_selected":  "#1f2d4a",
+        "bg_main":      "#11151f",
+        "bg_titlebar":  "#171b26",
+        "bg_sidebar":   "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #181d29, stop:1 #0d1017)",
+        "bg_sidebar_img": "assets/images/sidebar_bg_dark.png",
+        "bg_card":      "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1c212e, stop:1 #161a24)",
+        "bg_input":     "#12151d",
+        "bg_hover":     "rgba(255, 255, 255, 0.06)",
+        "bg_selected":  "rgba(59, 130, 246, 0.15)",
+        
+        "nav_bg_active": "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #1d4ed8)",
+        "nav_text_active": "#ffffff",
+        "nav_text": "#ffffff",
+        "nav_border":    "1px solid rgba(255, 255, 255, 0.04)",
 
         # borders / dividers
-        "border":       "#242b3d",
-        "border_accent":"#2563eb",
+        "border":       "rgba(255, 255, 255, 0.08)",
+        "border_accent":"#3b82f6",
 
         # text
         "text_primary": "#e2e8f0",
@@ -54,15 +61,22 @@ THEMES: dict[str, dict] = {
     },
 
     "light": {
-        "bg_main":      "#f0f4f8",
-        "bg_sidebar":   "#ffffff",
-        "bg_card":      "#ffffff",
-        "bg_input":     "#f8fafc",
-        "bg_hover":     "#eff6ff",
-        "bg_selected":  "#dbeafe",
+        "bg_main":      "#f3f6f9",
+        "bg_titlebar":  "#d2dae5",
+        "bg_sidebar":   "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e8eff5)",
+        "bg_sidebar_img": "assets/images/sidebar_bg_light.png",
+        "bg_card":      "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f8fafc)",
+        "bg_input":     "#e9eff5",
+        "bg_hover":     "rgba(0, 0, 0, 0.04)",
+        "bg_selected":  "rgba(37, 99, 235, 0.1)",
+        
+        "nav_bg_active": "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #2563eb)",
+        "nav_text_active": "#ffffff",
+        "nav_text": "#0f172a",
+        "nav_border":    "1px solid rgba(0, 0, 0, 0.05)",
 
-        "border":       "#e2e8f0",
-        "border_accent":"#2563eb",
+        "border":       "rgba(0, 0, 0, 0.08)",
+        "border_accent":"#3b82f6",
 
         "text_primary": "#1e293b",
         "text_secondary":"#475569",
@@ -114,32 +128,31 @@ QLabel a:hover {{
 
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
 QFrame#sidebar {{
+    border-image: url({bg_sidebar_img}) 0 0 0 0 stretch stretch;
     background-color: {bg_sidebar};
-    border-right: 1px solid {border};
 }}
 
 /* ── Nav buttons ─────────────────────────────────────────────────────── */
 QPushButton[class="nav-button"] {{
     background-color: transparent;
     text-align: left;
-    padding: 11px 18px 11px 16px;
+    padding: 8px 18px 8px 16px;
     border: none;
-    border-left: 3px solid transparent;
-    border-radius: 0;
+    border-radius: 10px;
+    margin: 2px 12px;
     font-size: 13px;
     font-weight: 500;
-    color: {text_secondary};
-    min-height: 40px;
+    color: {nav_text};
+    min-height: 28px;
 }}
 QPushButton[class="nav-button"]:hover {{
-    background-color: {bg_hover};
+    background: {bg_hover};
     color: {text_primary};
-    border-left: 3px solid {border};
 }}
 QPushButton[class="nav-button"]:checked {{
-    background-color: {bg_selected};
-    color: {accent};
-    border-left: 3px solid {accent};
+    background: {nav_bg_active};
+    border: none;
+    color: {nav_text_active};
     font-weight: 600;
 }}
 
@@ -147,6 +160,11 @@ QPushButton[class="nav-button"]:checked {{
 QStackedWidget {{
     background-color: {bg_main};
 }}
+
+/* ── Text properties ─────────────────────────────────────────────────── */
+QLabel[class="text-primary"] {{ color: {text_primary}; }}
+QLabel[class="text-secondary"] {{ color: {text_secondary}; }}
+QLabel[class="text-dim"] {{ color: {text_dim}; }}
 
 /* ── Page headings ───────────────────────────────────────────────────── */
 QLabel[class="h1"] {{
@@ -158,38 +176,37 @@ QLabel[class="h1"] {{
 
 /* ── Cards ───────────────────────────────────────────────────────────── */
 QFrame[class="card"] {{
-    background-color: {bg_card};
+    background: {bg_card};
     border: 1px solid {border};
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: 14px;
+    padding: 24px;
     margin-top: 14px;
 }}
 
 /* ── Action buttons ──────────────────────────────────────────────────── */
-QPushButton[class="action-button"] {{
-    background-color: {accent};
+QPushButton[class="action-button"], QPushButton[class="btn-primary"] {{
+    background: {nav_bg_active};
     color: #ffffff;
     border: none;
     padding: 9px 20px;
-    border-radius: 6px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.2px;
 }}
-QPushButton[class="action-button"]:hover {{
-    background-color: {accent_hover};
+QPushButton[class="action-button"]:hover, QPushButton[class="btn-primary"]:hover {{
+    opacity: 0.9;
 }}
-QPushButton[class="action-button"]:pressed {{
-    background-color: {accent};
-    opacity: 0.8;
+QPushButton[class="action-button"]:disabled, QPushButton[class="btn-primary"]:disabled {{
+    background-color: {bg_hover};
+    color: {text_dim};
 }}
-
 QPushButton[class="btn-success"] {{
     background-color: {success};
     color: #ffffff;
     border: none;
     padding: 9px 20px;
-    border-radius: 6px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
 }}
@@ -201,7 +218,7 @@ QPushButton[class="btn-danger"] {{
     color: #ffffff;
     border: none;
     padding: 9px 20px;
-    border-radius: 6px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
 }}
@@ -213,24 +230,12 @@ QPushButton[class="btn-warning"] {{
     color: #ffffff;
     border: none;
     padding: 9px 20px;
-    border-radius: 6px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
 }}
 QPushButton[class="btn-warning"]:hover {{
     opacity: 0.9;
-}}
-QPushButton[class="btn-primary"] {{
-    background-color: {accent};
-    color: #ffffff;
-    border: none;
-    padding: 9px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-}}
-QPushButton[class="btn-primary"]:hover {{
-    background-color: {accent_hover};
 }}
 
 /* ── Typography & helper labels ───────────────────────────────────────── */
@@ -261,8 +266,8 @@ QLineEdit, QTextEdit, QPlainTextEdit {{
     background-color: {bg_input};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 6px;
-    padding: 7px 11px;
+    border-radius: 10px;
+    padding: 9px 14px;
     selection-background-color: {accent};
 }}
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
@@ -273,8 +278,8 @@ QComboBox {{
     background-color: {bg_input};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 6px;
-    padding: 7px 11px;
+    border-radius: 10px;
+    padding: 9px 14px;
     min-height: 32px;
 }}
 QComboBox:focus {{
@@ -282,7 +287,7 @@ QComboBox:focus {{
 }}
 QComboBox::drop-down {{
     border: none;
-    width: 26px;
+    width: 28px;
 }}
 QComboBox QAbstractItemView {{
     background-color: {bg_card};
@@ -296,8 +301,8 @@ QSpinBox {{
     background-color: {bg_input};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 6px;
-    padding: 7px 11px;
+    border-radius: 10px;
+    padding: 9px 14px;
 }}
 QSpinBox:focus {{
     border: 1px solid {accent};
@@ -308,7 +313,7 @@ QTableWidget {{
     background-color: {bg_card};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 8px;
+    border-radius: 12px;
     gridline-color: {border};
 }}
 QHeaderView::section {{
@@ -332,12 +337,12 @@ QListWidget {{
     background-color: {bg_card};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 4px;
 }}
 QListWidget::item {{
-    padding: 9px 12px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 8px;
 }}
 QListWidget::item:hover {{
     background-color: {bg_hover};
@@ -350,12 +355,12 @@ QListWidget::item:selected {{
 /* ── Scroll bars ─────────────────────────────────────────────────────── */
 QScrollBar:vertical {{
     background: transparent;
-    width: 6px;
+    width: 7px;
     margin: 0;
 }}
 QScrollBar::handle:vertical {{
     background: {border};
-    border-radius: 3px;
+    border-radius: 3.5px;
     min-height: 30px;
 }}
 QScrollBar::handle:vertical:hover {{
@@ -366,12 +371,12 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
 }}
 QScrollBar:horizontal {{
     background: transparent;
-    height: 6px;
+    height: 7px;
     margin: 0;
 }}
 QScrollBar::handle:horizontal {{
     background: {border};
-    border-radius: 3px;
+    border-radius: 3.5px;
     min-width: 30px;
 }}
 QScrollBar::handle:horizontal:hover {{
@@ -388,7 +393,7 @@ QGroupBox {{
     font-size: 12px;
     letter-spacing: 0.5px;
     border: 1px solid {border};
-    border-radius: 8px;
+    border-radius: 12px;
     margin-top: 14px;
     padding-top: 18px;
     text-transform: uppercase;
@@ -416,9 +421,9 @@ QToolTip {{
     background-color: {bg_card};
     color: {text_primary};
     border: 1px solid {border_accent};
-    padding: 6px 10px;
+    padding: 8px 12px;
     font-size: 12px;
-    border-radius: 6px;
+    border-radius: 10px;
 }}
 
 /* ── Progress / Dialogs ──────────────────────────────────────────────── */
@@ -426,19 +431,19 @@ QProgressDialog {{
     background-color: {bg_card};
     color: {text_primary};
     border: 1px solid {border};
-    border-radius: 10px;
+    border-radius: 14px;
 }}
 QProgressBar {{
     background-color: {bg_input};
     border: 1px solid {border};
-    border-radius: 4px;
+    border-radius: 6px;
     text-align: center;
     color: {text_primary};
     height: 8px;
 }}
 QProgressBar::chunk {{
     background-color: {accent};
-    border-radius: 4px;
+    border-radius: 6px;
 }}
 
 /* ── Check boxes / Radio ─────────────────────────────────────────────── */
@@ -450,7 +455,7 @@ QCheckBox::indicator {{
     width: 18px;
     height: 18px;
     border: 2px solid {border};
-    border-radius: 4px;
+    border-radius: 6px;
     background: {bg_input};
 }}
 QCheckBox::indicator:checked {{
@@ -475,6 +480,9 @@ QRadioButton::indicator:checked {{
 }}
 
 /* ── Slider ──────────────────────────────────────────────────────────── */
+QSlider::horizontal {{
+    min-height: 24px;
+}}
 QSlider::groove:horizontal {{
     background: {bg_input};
     height: 4px;
@@ -499,6 +507,35 @@ QMessageBox {{
 QMessageBox QLabel {{
     color: {text_primary};
 }}
+/* ── Title Bar ───────────────────────────────────────────────────────── */
+QFrame#titleBar {{
+    background-color: {bg_titlebar};
+}}
+QLabel#titleLabel {{
+    color: {text_primary};
+}}
+QPushButton[class="mac-btn"] {{
+    border: none;
+    border-radius: 6px;
+    min-width: 12px;
+    max-width: 12px;
+    min-height: 12px;
+    max-height: 12px;
+    font-family: Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 900;
+    color: transparent;
+    padding: 0px 0px 1px 0px;
+    margin: 0px 3px;
+}}
+QPushButton#macClose {{ background-color: #ff5f56; }}
+QPushButton#macMin {{ background-color: #ffbd2e; }}
+QPushButton#macMax {{ background-color: #27c93f; }}
+
+QFrame#macBtnContainer:hover QPushButton#macClose {{ color: #4d0000; }}
+QFrame#macBtnContainer:hover QPushButton#macMin {{ color: #995b00; }}
+QFrame#macBtnContainer:hover QPushButton#macMax {{ color: #004d00; }}
+
 """
 
 

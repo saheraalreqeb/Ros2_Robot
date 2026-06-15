@@ -152,7 +152,7 @@ class ActionInspectorPage(QWidget):
             QListWidget {{
                 background-color: {p['bg_card']};
                 border: 1px solid {p['border']};
-                border-radius: 6px;
+                border-radius: 10px;
                 color: {p['text_primary']};
                 font-size: 14px;
                 padding: 4px;
@@ -208,7 +208,7 @@ class ActionInspectorPage(QWidget):
                 background-color: {p['bg_card']};
                 color: {p['text_primary']};
                 border: 1px solid {p['border']};
-                border-radius: 6px;
+                border-radius: 10px;
                 font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
                 font-size: 12px;
                 padding: 6px;
@@ -258,7 +258,7 @@ class ActionInspectorPage(QWidget):
         self.txt_goal_output.setPlaceholderText("Goal execution output will be displayed here...")
         self.txt_goal_output.setFixedHeight(120)
         self.txt_goal_output.setStyleSheet(
-            f"background-color: #1b1b1b; color: #d4d4d4; border: 1px solid {p['border']}; font-family: monospace; font-size: 11px;"
+            f"background-color: {p['bg_input']}; color: {p['text_primary']}; border: 1px solid {p['border']}; font-family: monospace; font-size: 11px; border-radius: 10px;"
         )
         goal_lay.addWidget(self.txt_goal_output)
         
@@ -275,7 +275,7 @@ class ActionInspectorPage(QWidget):
             QListWidget {{
                 background-color: {p['bg_card']};
                 border: 1px solid {p['border']};
-                border-radius: 6px;
+                border-radius: 10px;
                 color: {p['text_primary']};
                 font-size: 14px;
                 padding: 4px;
@@ -301,7 +301,7 @@ class ActionInspectorPage(QWidget):
                 background-color: {p['bg_card']};
                 color: {p['text_primary']};
                 border: 1px solid {p['border']};
-                border-radius: 6px;
+                border-radius: 10px;
                 font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
                 font-size: 12px;
                 padding: 6px;
@@ -313,7 +313,7 @@ class ActionInspectorPage(QWidget):
         )
         self.btn_send_goal.setStyleSheet(f"background-color: {p['accent']}; color: white; font-weight: bold;")
         self.txt_goal_output.setStyleSheet(
-            f"background-color: #1b1b1b; color: #d4d4d4; border: 1px solid {p['border']}; font-family: monospace; font-size: 11px;"
+            f"background-color: {p['bg_input']}; color: {p['text_primary']}; border: 1px solid {p['border']}; font-family: monospace; font-size: 11px; border-radius: 10px;"
         )
         self.splitter.setStyleSheet(
             f"QSplitter::handle {{ background-color: {p['border']}; }}"

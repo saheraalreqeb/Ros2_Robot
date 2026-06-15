@@ -31,8 +31,8 @@ import subprocess
 
 import psutil
 import qtawesome as qta
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QObject, QEvent
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QObject, QEvent, QPoint
+from PySide6.QtGui import QIcon, QMouseEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFileDialog,
@@ -106,6 +106,89 @@ class DiscoveryDaemon(QThread):
 
     def stop(self):
         self.running = False
+
+
+class TitleBar(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.setObjectName("titleBar")
+        self.setFixedHeight(36)
+        
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(12, 0, 12, 0)
+        lay.setSpacing(10)
+        
+        left_dummy = QWidget()
+        left_dummy.setFixedWidth(60)
+        lay.addWidget(left_dummy)
+        
+        lay.addStretch()
+        
+        self.title_lbl = QLabel("ROS2 Robot")
+        self.title_lbl.setObjectName("titleLabel")
+        self.title_lbl.setStyleSheet("font-weight: 700; font-size: 13px;")
+        self.title_lbl.setAlignment(Qt.AlignCenter)
+        lay.addWidget(self.title_lbl)
+        
+        lay.addStretch()
+        
+        self.macBtnContainer = QFrame()
+        self.macBtnContainer.setObjectName("macBtnContainer")
+        self.macBtnContainer.setFixedWidth(60)
+        mac_lay = QHBoxLayout(self.macBtnContainer)
+        mac_lay.setContentsMargins(0, 0, 0, 0)
+        mac_lay.setSpacing(6)
+        mac_lay.setAlignment(Qt.AlignCenter)
+        
+        self.min_btn = QPushButton("—")
+        self.min_btn.setProperty("class", "mac-btn")
+        self.min_btn.setObjectName("macMin")
+        self.min_btn.clicked.connect(self.parent.showMinimized)
+        
+        self.max_btn = QPushButton("＋")
+        self.max_btn.setProperty("class", "mac-btn")
+        self.max_btn.setObjectName("macMax")
+        self.max_btn.clicked.connect(self._toggle_maximize)
+        
+        self.close_btn = QPushButton("✕")
+        self.close_btn.setProperty("class", "mac-btn")
+        self.close_btn.setObjectName("macClose")
+        self.close_btn.clicked.connect(self.parent.close)
+
+        mac_lay.addWidget(self.min_btn)
+        mac_lay.addWidget(self.max_btn)
+        mac_lay.addWidget(self.close_btn)
+        
+        lay.addWidget(self.macBtnContainer)
+        
+        self._start_pos = None
+
+    def _toggle_maximize(self):
+        if self.parent.isMaximized():
+            self.parent.showNormal()
+        else:
+            self.parent.showMaximized()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self._start_pos = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._start_pos is not None:
+            delta = event.globalPosition().toPoint() - self._start_pos
+            self.parent.move(self.parent.pos() + delta)
+            self._start_pos = event.globalPosition().toPoint()
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._start_pos = None
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self._toggle_maximize()
+
+    def refresh_theme(self):
+        pass
 
 
 class ColconBuildWorker(QThread):
@@ -244,21 +327,21 @@ class ProcessLogReader(QThread):
 
 _NAV_ENTRIES = [
     # (page_id, attr_name,   label,            icon_name,             refresh_method_or_None)
-    (0, "btn_workspace",      "Workspace",         "fa5s.folder-open",    None),
-    (1, "btn_packages",       "Packages",          "fa5s.box",            None),
-    (2, "btn_nodes",          "Nodes",             "fa5s.microchip",      "_refresh_nodes_list"),
-    (3, "btn_topics",         "Topic Inspector",   "fa5s.satellite-dish", "_refresh_topics"),
-    (4, "btn_launch",         "Launch Manager",    "fa5s.rocket",         "_refresh_launch"),
-    (5, "btn_services",       "Service Inspector", "fa5s.handshake",      "_refresh_services"),
-    (6, "btn_actions",        "Action Inspector",  "fa5s.bullseye",       "_refresh_actions"),
-    (7, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
-    (8, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
-    (9, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
-    (10, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
-    (11, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
-    (12, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
-    (13, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
-    (14, "btn_settings",      "Settings",          "fa5s.cog",            None),
+    (0, "btn_workspace",      "Workspace",                             "fa5s.folder-open",    None),
+    (1, "btn_packages",       "Packages",                              "fa5s.box",            None),
+    (2, "btn_nodes",          "Nodes",                                 "fa5s.microchip",      "_refresh_nodes_list"),
+    (3, "btn_topics",         "Topic Inspector",                       "fa5s.satellite-dish", "_refresh_topics"),
+    (10, "btn_visualizer",    "Visualizer",                            "fa5s.project-diagram","_refresh_visualizer"),
+    (4, "btn_launch",         "Launch Manager",                        "fa5s.rocket",         "_refresh_launch"),
+    (12, "btn_urdf",          "URDF Viewer (Beta)",                    "fa5s.cubes",          "_refresh_urdf"),
+    (11, "btn_bags",          "Bag Manager",                           "fa5s.database",       "_refresh_bags"),
+    (7, "btn_logs",           "Log Viewer",                            "fa5s.file-alt",       "_refresh_logs"),
+    (13, "btn_tools",         "Tools Hub (Beta)",                      "fa5s.tools",          "_refresh_tools"),
+    (5, "btn_services",       "Service Inspector (Beta)",              "fa5s.handshake",      "_refresh_services"),
+    (6, "btn_actions",        "Action Inspector (Beta)",               "fa5s.bullseye",       "_refresh_actions"),
+    (8, "btn_troubleshooter", "DDS Troubleshooter (Beta)",             "fa5s.network-wired",  None),
+    (9, "btn_params",         "Parameters",                            "fa5s.sliders-h",      "_refresh_params"),
+    (14, "btn_settings",      "Settings",                              "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -520,12 +603,24 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QApplication
         ThemeManager.apply(QApplication.instance(), "dark")
 
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        
         # Central layout
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-        self.main_layout = QHBoxLayout(self.central_widget)
+        
+        self.root_layout = QVBoxLayout(self.central_widget)
+        self.root_layout.setContentsMargins(0, 0, 0, 0)
+        self.root_layout.setSpacing(0)
+        
+        self.title_bar = TitleBar(self)
+        self.root_layout.addWidget(self.title_bar)
+        
+        self.main_content_widget = QWidget()
+        self.main_layout = QHBoxLayout(self.main_content_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
+        self.root_layout.addWidget(self.main_content_widget, 1)
 
         self._setup_sidebar()
         self._setup_content_area()
@@ -540,6 +635,19 @@ class MainWindow(QMainWindow):
         QApplication.instance().aboutToQuit.connect(self._on_shutdown)
         
         self.statusBar().showMessage("Ready  ·  Ros2 Robot")
+        self.statusBar().setSizeGripEnabled(True)
+        
+        self._center_window()
+
+    def _center_window(self):
+        from PySide6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.geometry()
+            window_geometry = self.geometry()
+            x = (screen_geometry.width() - window_geometry.width()) // 2
+            y = (screen_geometry.height() - window_geometry.height()) // 2
+            self.move(x, y)
 
     def _get_settings_path(self):
         import os
@@ -568,10 +676,11 @@ class MainWindow(QMainWindow):
             theme = settings.get("theme", "dark")
             self._on_theme_changed(theme)
             
-            # 3. Tab Visibility
+            # 3. Tab Visibility & Order
             vis_dict = settings.get("tab_visibility", {})
-            if vis_dict and hasattr(self, "settings_page"):
-                self.settings_page.set_tab_visibility(vis_dict)
+            order_list = settings.get("tab_order", [])
+            if hasattr(self, "settings_page"):
+                self.settings_page.set_tab_state(vis_dict, order_list)
                 self._apply_tab_visibility()
 
             # 4. OpenGL Setting
@@ -596,6 +705,7 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, "settings_page"):
             settings["tab_visibility"] = self.settings_page.tab_visibility()
+            settings["tab_order"] = self.settings_page.tab_order()
             settings["use_opengl"] = self.settings_page.is_opengl_enabled()
             
         try:
@@ -623,7 +733,7 @@ class MainWindow(QMainWindow):
     def _setup_sidebar(self):
         self.sidebar = QFrame()
         self.sidebar.setObjectName("sidebar")
-        self.sidebar.setFixedWidth(230)
+        self.sidebar.setFixedWidth(240)
 
         sb_lay = QVBoxLayout(self.sidebar)
         sb_lay.setContentsMargins(0, 0, 0, 0)
@@ -639,11 +749,11 @@ class MainWindow(QMainWindow):
         logo_lay.setContentsMargins(18, 0, 18, 0)
         logo_lay.setSpacing(10)
 
-        logo_icon = QLabel()
-        logo_icon.setPixmap(
-            ThemeManager.icon("fa5s.robot", "accent").pixmap(22, 22)
+        self.logo_icon = QLabel()
+        self.logo_icon.setPixmap(
+            ThemeManager.icon("mdi.robot-outline", "accent").pixmap(32, 32)
         )
-        logo_lay.addWidget(logo_icon)
+        logo_lay.addWidget(self.logo_icon)
 
         logo_txt = QLabel("Ros2 Robot")
         logo_txt.setStyleSheet(
@@ -660,6 +770,11 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self._nav_buttons: dict[str, QPushButton] = {}
+        
+        self.nav_layout = QVBoxLayout()
+        self.nav_layout.setContentsMargins(0, 0, 0, 0)
+        self.nav_layout.setSpacing(4)
+        sb_lay.addLayout(self.nav_layout)
 
         for page_id, attr, label, icon_name, _ in _NAV_ENTRIES:
             btn = self._create_nav_button(page_id, label, icon_name)
@@ -668,19 +783,21 @@ class MainWindow(QMainWindow):
             if attr == "btn_topics":
                 btn.setObjectName("nav_btn_inspector")
 
-            # Tools Hub & Settings get pushed to bottom
             if attr == "btn_tools":
                 sb_lay.addStretch()
+                sb_lay.addSpacing(16)
                 # thin divider
                 div = QFrame()
                 div.setFixedHeight(1)
-                div.setStyleSheet(
-                    "background-color: palette(shadow); margin: 0 16px;"
-                )
+                div.setStyleSheet("background-color: palette(shadow); margin: 0 16px;")
                 sb_lay.addWidget(div)
                 sb_lay.addSpacing(4)
-
-            sb_lay.addWidget(btn)
+                sb_lay.addWidget(btn)
+            elif attr == "btn_settings":
+                btn.setStyleSheet("margin-top: 0px;")
+                sb_lay.addWidget(btn)
+            else:
+                self.nav_layout.addWidget(btn)
 
         sb_lay.addSpacing(8)
         self.main_layout.addWidget(self.sidebar)
@@ -691,6 +808,7 @@ class MainWindow(QMainWindow):
     def _create_nav_button(self, page_id: int, label: str,
                            icon_name: str) -> QPushButton:
         btn = QPushButton(f"  {label}")
+        btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         btn.setProperty("class", "nav-button")
         btn.setCheckable(True)
         btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(16, 16))
@@ -706,6 +824,13 @@ class MainWindow(QMainWindow):
                 is_active = btn.isChecked()
                 role = "accent" if is_active else "normal"
                 btn.setIcon(ThemeManager.icon(icon_name, role))
+        
+        if hasattr(self, "logo_icon"):
+            self.logo_icon.setPixmap(
+                ThemeManager.icon("mdi.robot-outline", "accent").pixmap(32, 32)
+            )
+        if hasattr(self, "title_bar"):
+            self.title_bar.refresh_theme()
 
     # ── Content area ──────────────────────────────────────────────────────────
 
@@ -1142,6 +1267,7 @@ class MainWindow(QMainWindow):
         page = SettingsPage(self)
         page.theme_changed.connect(self._on_theme_changed)
         page.tab_visibility_changed.connect(self._apply_tab_visibility)
+        page.tab_order_changed.connect(self._apply_tab_visibility)
         page.opengl_setting_changed.connect(self._apply_opengl_setting)
         page.save_requested.connect(self._force_save_settings)
         return page
@@ -1183,16 +1309,50 @@ class MainWindow(QMainWindow):
 
     def _apply_tab_visibility(self):
         vis = self.settings_page.tab_visibility()
+        order = self.settings_page.tab_order()
+        
+        attr_by_key = {v: k for k, v in _TAB_KEY_FOR_BTN.items()}
+        
+        # 1. Hide/Show
         for page_id, attr, _label, _icon, _ in _NAV_ENTRIES:
             btn = self._nav_buttons.get(attr)
             if btn is None:
                 continue
             key = _TAB_KEY_FOR_BTN.get(attr, "")
-            # Settings and Workspace are always visible
             if key in ("settings", "workspace"):
                 btn.setVisible(True)
             else:
                 btn.setVisible(vis.get(key, True))
+                
+        # 2. Reorder Nav Layout
+        for attr, btn in self._nav_buttons.items():
+            if attr not in ("btn_settings", "btn_tools"):
+                self.nav_layout.removeWidget(btn)
+                
+        added_attrs = set()
+        
+        # Workspace is permanently anchored at the top of the layout
+        btn_workspace = self._nav_buttons.get("btn_workspace")
+        if btn_workspace:
+            self.nav_layout.addWidget(btn_workspace)
+            added_attrs.add("btn_workspace")
+            
+        for key in order:
+            if key in ("settings", "workspace", "tools"):
+                continue
+            attr = attr_by_key.get(key)
+            if attr:
+                btn = self._nav_buttons.get(attr)
+                if btn:
+                    self.nav_layout.addWidget(btn)
+                    added_attrs.add(attr)
+                    
+        # Fallback for missing entries
+        for page_id, attr, _, _, _ in _NAV_ENTRIES:
+            if attr not in ("btn_settings", "btn_tools") and attr not in added_attrs:
+                btn = self._nav_buttons.get(attr)
+                if btn:
+                    self.nav_layout.addWidget(btn)
 
     def _apply_opengl_setting(self, use_opengl: bool):
         if hasattr(self, "urdf_page") and hasattr(self.urdf_page, "set_use_opengl"):
@@ -1443,9 +1603,10 @@ class MainWindow(QMainWindow):
         self.btn_cancel_build.clicked.connect(self._cancel_colcon_build)
         ctrl_row.addWidget(self.btn_cancel_build)
 
+        p = ThemeManager.palette()
         self.lbl_build_badge = QLabel("Idle")
         self.lbl_build_badge.setStyleSheet(
-            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
+            f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['bg_hover']}; color: {p['text_secondary']};"
         )
         ctrl_row.addWidget(self.lbl_build_badge)
         ctrl_row.addStretch()
@@ -1458,7 +1619,7 @@ class MainWindow(QMainWindow):
         self.txt_build_console.setFixedHeight(220)
         self.txt_build_console.setPlaceholderText("Build output logs will be streamed here in real-time...")
         self.txt_build_console.setStyleSheet(
-            "background-color: #1b1b1b; color: #d4d4d4; font-family: monospace; font-size: 11px; border: 1px solid palette(shadow);"
+            f"background-color: {p['bg_input']}; color: {p['text_primary']}; font-family: monospace; font-size: 11px; border: 1px solid {p['border']}; border-radius: 10px;"
         )
         build_card_lay.addWidget(self.txt_build_console)
 
@@ -1904,7 +2065,7 @@ class MainWindow(QMainWindow):
         p = ThemeManager.palette()
         self.lbl_build_badge.setText("Building")
         self.lbl_build_badge.setStyleSheet(
-            "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #d35400; color: white;"
+            f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['warning']}; color: white;"
         )
 
         self.btn_start_build.setEnabled(False)
@@ -1960,9 +2121,10 @@ class MainWindow(QMainWindow):
             self.txt_build_console.append("\n⚠ Build execution canceled by user.\n")
             self.statusBar().showMessage("Build canceled.", 5000)
             
+            p = ThemeManager.palette()
             self.lbl_build_badge.setText("Canceled")
             self.lbl_build_badge.setStyleSheet(
-                "font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: #333333; color: #aaaaaa;"
+                f"font-weight: bold; border-radius: 4px; padding: 4px 8px; background-color: {p['bg_hover']}; color: {p['text_secondary']};"
             )
 
     def _refresh_actions(self):

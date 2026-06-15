@@ -391,9 +391,9 @@ class DDSTroubleshooterPage(QWidget):
             self.rec_card.setStyleSheet(
                 f"""
                 QFrame {{
-                    background-color: rgba(245, 158, 11, 0.1);
+                    background-color: {p['bg_selected']};
                     border: 1px solid {p['warning']};
-                    border-radius: 6px;
+                    border-radius: 12px;
                     padding: 14px;
                 }}
                 """

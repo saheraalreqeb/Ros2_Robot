@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QAbstractItemView, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
+from gui.theme import ThemeManager
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +237,9 @@ class BagManagerPage(QWidget):
 
         self.btn_record = self.btn_record_selected
 
-        self.lbl_record_indicator = QLabel("")
-        self.lbl_record_indicator.setStyleSheet(_RECORDING_DOT)
+        self.lbl_record_indicator = QLabel("● REC ")
+        p = ThemeManager.palette()
+        self.lbl_record_indicator.setStyleSheet(f"color: {p['danger']}; font-size: 16px; font-weight: bold;")
         ctrl_row.addWidget(self.lbl_record_indicator)
         ctrl_row.addStretch()
         lay.addLayout(ctrl_row)
@@ -311,8 +313,8 @@ class BagManagerPage(QWidget):
         opts.addWidget(self.btn_play)
 
         self.lbl_play_status = QLabel("")
-        self.lbl_play_status.setProperty("class", "muted")
-        self.lbl_play_status.setStyleSheet("color: #888888; font-size: 13px;")
+        p = ThemeManager.palette()
+        self.lbl_play_status.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
         opts.addWidget(self.lbl_play_status)
         lay.addLayout(opts)
 
