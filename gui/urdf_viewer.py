@@ -532,6 +532,7 @@ class URDFLink:
         self.geometry_size: tuple = ()
         self.visual_xyz: List[float] = [0.0, 0.0, 0.0]
         self.visual_rpy: List[float] = [0.0, 0.0, 0.0]
+        self.visual_color: Optional[List[float]] = None
         # Mesh-specific fields
         self.mesh_filename: str = ""          # raw filename attr from URDF
         self.mesh_scale: List[float] = [1.0, 1.0, 1.0]
@@ -894,17 +895,24 @@ class URDFViewport3D(QOpenGLWidget):
             
             gt = link.geometry_type
             gs = link.geometry_size
+            
+            if link.visual_color:
+                vc = link.visual_color
+                mat_color = QColor.fromRgbF(vc[0], vc[1], vc[2])
+            else:
+                mat_color = base_color if gt != "mesh" else mesh_color
+                
             if gt == "box" and len(gs) >= 3:
-                faces = _box_faces(gs[0], gs[1], gs[2], base_color)
+                faces = _box_faces(gs[0], gs[1], gs[2], mat_color)
             elif gt == "cylinder" and len(gs) >= 2:
-                faces = _cylinder_faces(gs[0], gs[1], base_color)
+                faces = _cylinder_faces(gs[0], gs[1], mat_color)
             elif gt == "sphere" and len(gs) >= 1:
-                faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
+                faces = _sphere_faces(gs[0], mat_color, rings=6, segs=8)
             elif gt == "mesh":
                 if link.mesh_faces:
                     faces = link.mesh_faces
                 else:
-                    faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
+                    faces = _box_faces(0.06, 0.06, 0.06, mat_color)
             else:
                 continue
                 
@@ -975,12 +983,19 @@ class URDFViewport3D(QOpenGLWidget):
             render_type = "poly"
             gt = link.geometry_type
             gs = link.geometry_size
+            
+            if link.visual_color:
+                vc = link.visual_color
+                mat_color = QColor.fromRgbF(vc[0], vc[1], vc[2])
+            else:
+                mat_color = base_color if gt != "mesh" else mesh_color
+                
             if gt == "box" and len(gs) >= 3:
-                faces = _box_faces(gs[0], gs[1], gs[2], base_color)
+                faces = _box_faces(gs[0], gs[1], gs[2], mat_color)
             elif gt == "cylinder" and len(gs) >= 2:
-                faces = _cylinder_faces(gs[0], gs[1], base_color)
+                faces = _cylinder_faces(gs[0], gs[1], mat_color)
             elif gt == "sphere" and len(gs) >= 1:
-                faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
+                faces = _sphere_faces(gs[0], mat_color, rings=6, segs=8)
             elif gt == "mesh":
                 is_moving = self._is_interacting
                 if force_high_quality:
@@ -990,14 +1005,14 @@ class URDFViewport3D(QOpenGLWidget):
                     
                 if is_moving and not self._use_opengl:
                     # Approach C: Semi-transparent wireframe silhouette
-                    box_col = QColor(mesh_color)
+                    box_col = QColor(mat_color)
                     box_col.setAlpha(150)
                     faces = _box_faces(0.1, 0.1, 0.1, box_col)
                     render_type = "wireframe"
                 elif link.mesh_faces:
                     faces = link.mesh_faces
                 else:
-                    faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
+                    faces = _box_faces(0.06, 0.06, 0.06, mat_color)
             else:
                 # No visual geometry → tiny marker
                 faces = _sphere_faces(0.012, none_col, rings=3, segs=4)
@@ -1576,7 +1591,20 @@ class URDFViewerPage(QWidget):
         robot = root_el if root_el.tag == "robot" else (
             root_el.find(".//robot") or root_el
         )
-        self._extract_links(robot)
+        
+        global_materials = {}
+        for mat in robot.findall("material"):
+            name = mat.get("name")
+            col = mat.find("color")
+            if name and col is not None:
+                rgba = col.get("rgba")
+                if rgba:
+                    try:
+                        global_materials[name] = [float(x) for x in rgba.split()[:4]]
+                    except ValueError:
+                        pass
+
+        self._extract_links(robot, global_materials)
         self._extract_joints(robot)
 
         if not self.links:
@@ -1603,7 +1631,7 @@ class URDFViewerPage(QWidget):
         )
         return None
 
-    def _extract_links(self, robot: ET.Element) -> None:
+    def _extract_links(self, robot: ET.Element, global_materials: Dict[str, List[float]]) -> None:
         for el in robot.findall(".//link"):
             name = el.get("name")
             if not name:
@@ -1625,6 +1653,20 @@ class URDFViewerPage(QWidget):
                         lk.visual_rpy = [float(v) for v in orig.get("rpy", "0 0 0").split()[:3]]
                     except ValueError:
                         pass
+                        
+                mat = vis.find("material")
+                if mat is not None:
+                    mat_name = mat.get("name")
+                    col = mat.find("color")
+                    if col is not None:
+                        rgba = col.get("rgba")
+                        if rgba:
+                            try:
+                                lk.visual_color = [float(x) for x in rgba.split()[:4]]
+                            except ValueError:
+                                pass
+                    elif mat_name and mat_name in global_materials:
+                        lk.visual_color = global_materials[mat_name]
 
                 geom = vis.find("geometry")
                 if geom is not None:
@@ -1739,8 +1781,14 @@ class URDFViewerPage(QWidget):
                 continue
 
             if tris:
+                if link.visual_color:
+                    vc = link.visual_color
+                    mat_color = QColor.fromRgbF(vc[0], vc[1], vc[2])
+                else:
+                    mat_color = QColor(ThemeManager.palette()["info"])
+                
                 link.mesh_faces = _tris_to_faces(
-                    tris, link.mesh_scale, accent
+                    tris, link.mesh_scale, mat_color
                 )
 
     # ── hierarchy tree ──────────────────────────────────────────────────────
