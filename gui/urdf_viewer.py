@@ -1105,7 +1105,7 @@ class URDFViewerPage(QWidget):
         self._apply_toolbar_style(p)
 
         tb = QHBoxLayout(self.toolbar)
-        tb.setContentsMargins(16, 6, 16, 6)
+        tb.setContentsMargins(16, 6, 50, 6)
         tb.setSpacing(10)
 
         lbl_title = QLabel("URDF Viewer")
