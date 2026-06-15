@@ -145,7 +145,7 @@ Type=Application
 Name=Ros2 Robot
 Comment=Modern GUI for ROS 2 Workspaces
 Exec=$HOME/.local/bin/ros2_robot
-Icon=applications-engineering
+Icon=$REPO_DIR/assets/icons/app_icon.svg
 Terminal=false
 Categories=Development;Engineering;
 EOF

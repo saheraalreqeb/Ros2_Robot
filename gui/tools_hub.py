@@ -112,7 +112,7 @@ class _ToolRow(QFrame):
         icon_frame.setStyleSheet(
             "background-color: palette(window);"
             "border: 1px solid palette(shadow);"
-            "border-radius: 10px;"
+            "border-radius: 12px;"
         )
         icon_lay = QVBoxLayout(icon_frame)
         icon_lay.setContentsMargins(0, 0, 0, 0)
@@ -153,7 +153,7 @@ class _ToolRow(QFrame):
         self._status_lbl.setAlignment(Qt.AlignRight)
         self._status_lbl.setStyleSheet(
             "font-size: 11px; font-weight: 600; padding: 2px 8px;"
-            "border-radius: 10px; background: transparent;"
+            "border-radius: 12px; background: transparent;"
         )
         right_col.addWidget(self._status_lbl)
 

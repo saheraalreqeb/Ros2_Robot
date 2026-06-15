@@ -383,8 +383,8 @@ class SettingsPage(QWidget):
     def refresh_theme(self) -> None:
         p = ThemeManager.palette()
         list_style = (
-            f"QListWidget {{ background: {p['bg_input']}; border: 1px solid {p['border']}; border-radius: 6px; outline: none; padding: 4px; }}"
-            f"QListWidget::item {{ padding: 6px; margin: 2px; border-radius: 4px; background: {p['bg_card']}; color: {p['text_primary']}; }}"
+            f"QListWidget {{ background: {p['bg_input']}; border: 1px solid {p['border']}; border-radius: 10px; outline: none; padding: 4px; }}"
+            f"QListWidget::item {{ padding: 6px; margin: 2px; border-radius: 8px; background: {p['bg_card']}; color: {p['text_primary']}; }}"
             f"QListWidget::item:selected {{ background: {p['bg_selected']}; color: {p['accent']}; font-weight: bold; border: 1px solid {p['border_accent']}; }}"
         )
         self._active_list.setStyleSheet(list_style)
@@ -423,7 +423,7 @@ class _ThemeOptionButton(QFrame):
 
         self.setObjectName("ThemeButton")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(130, 80)
+        self.setFixedSize(140, 90)
 
         lay = QVBoxLayout(self)
         lay.setAlignment(Qt.AlignCenter)
@@ -460,13 +460,13 @@ class _ThemeOptionButton(QFrame):
             self.setStyleSheet(
                 f"#ThemeButton {{ background-color: {p['bg_selected']};"
                 f" border: 2px solid {p['accent']};"
-                f" border-radius: 10px; }}"
+                f" border-radius: 14px; }}"
             )
         else:
             self.setStyleSheet(
                 f"#ThemeButton {{ background-color: {p['bg_card']};"
                 f" border: 1px solid {p['border']};"
-                f" border-radius: 10px; }}"
+                f" border-radius: 14px; }}"
             )
 
     def mousePressEvent(self, _event) -> None:  # noqa: N802

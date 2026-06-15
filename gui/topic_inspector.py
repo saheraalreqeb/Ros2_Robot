@@ -791,9 +791,9 @@ class TopicInspectorPage(QWidget):
             self.qos_warning_card.setStyleSheet(
                 f"""
                 QFrame {{
-                    background-color: rgba(239, 68, 68, 0.1);
+                    background-color: {p['bg_selected']};
                     border: 1px solid {p['danger']};
-                    border-radius: 6px;
+                    border-radius: 12px;
                     padding: 12px;
                 }}
                 """
@@ -811,9 +811,9 @@ class TopicInspectorPage(QWidget):
                 self.qos_warning_card.setStyleSheet(
                     f"""
                     QFrame {{
-                        background-color: rgba(34, 197, 94, 0.1);
+                        background-color: {p['bg_selected']};
                         border: 1px solid {p['success']};
-                        border-radius: 6px;
+                        border-radius: 12px;
                         padding: 12px;
                     }}
                     """
@@ -919,8 +919,9 @@ class TopicInspectorPage(QWidget):
         self._echo_thread.new_line.connect(self._append_echo_line)
         self._echo_thread.start()
 
+        p = ThemeManager.palette()
         self.btn_echo.setText("Stop Echo")
-        self.btn_echo.setStyleSheet("background-color: #e74c3c; color: white;")
+        self.btn_echo.setStyleSheet(f"background-color: {p['danger']}; color: white; border-radius: 10px;")
 
     def _stop_echo(self):
         """Terminate the echo subprocess and reader thread cleanly."""
