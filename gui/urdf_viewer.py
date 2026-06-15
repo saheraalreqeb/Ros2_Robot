@@ -601,6 +601,7 @@ class URDFViewport3D(QOpenGLWidget):
         self._interaction_timer.timeout.connect(self._on_interaction_end)
 
         self._use_opengl = False
+        self._gl_initialized = False
 
         self.setMinimumSize(QSize(300, 220))
         self.setMouseTracking(True)
@@ -707,31 +708,107 @@ class URDFViewport3D(QOpenGLWidget):
 
     # ── painting ────────────────────────────────────────────────────────────
 
-    def paintEvent(self, _ev) -> None:  # noqa: N802
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+    def initializeGL(self) -> None:
+        from PySide6.QtGui import QOpenGLFunctions
+        from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLShader, QOpenGLBuffer
 
-        pal = ThemeManager.palette()
-        painter.fillRect(self.rect(), QColor(pal["bg_main"]))
+        self.gl_funcs = QOpenGLFunctions(self.context())
+        self.gl_funcs.initializeOpenGLFunctions()
 
-        if not self._links:
-            painter.setPen(QColor(pal["text_dim"]))
-            painter.setFont(QFont("Segoe UI", 13))
-            painter.drawText(
-                self.rect(), Qt.AlignCenter,
-                "Select a URDF / Xacro file\nto view the robot in 3-D",
-            )
-            painter.end()
+        self.gl_program = QOpenGLShaderProgram()
+        v_shader = """
+        #version 120
+        attribute vec3 position;
+        attribute vec3 normal;
+        attribute vec3 color;
+        uniform mat4 mvp;
+        uniform mat4 model;
+        varying vec3 v_normal;
+        varying vec3 v_color;
+        void main() {
+            gl_Position = mvp * vec4(position, 1.0);
+            v_normal = mat3(model) * normal;
+            v_color = color;
+        }
+        """
+        f_shader = """
+        #version 120
+        varying vec3 v_normal;
+        varying vec3 v_color;
+        void main() {
+            vec3 light = normalize(vec3(0.3, 0.7, 0.6));
+            vec3 n = normalize(v_normal);
+            float diff = max(dot(n, light), 0.2);
+            gl_FragColor = vec4(v_color * diff, 1.0);
+        }
+        """
+        self.gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, v_shader)
+        self.gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, f_shader)
+        self.gl_program.link()
+
+        self.gl_vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
+        self.gl_vbo.create()
+        self._gl_initialized = True
+
+    def resizeGL(self, w: int, h: int) -> None:
+        if self._gl_initialized:
+            self.gl_funcs.glViewport(0, 0, w, h)
+
+    def paintGL(self) -> None:
+        if not self._gl_initialized:
             return
 
-        self._draw_grid(painter, pal)
-        self._draw_axes(painter)
+        pal = ThemeManager.palette()
 
-        fk = self._compute_fk()
-        self._draw_robot(painter, pal, fk)
-        self._draw_labels(painter, pal, fk)
-        self._draw_hud(painter, pal)
-        painter.end()
+        if self._use_opengl and self._links:
+            # Hardware Rendering
+            f = self.gl_funcs
+            f.glClearColor(QColor(pal["bg_main"]).redF(), QColor(pal["bg_main"]).greenF(), QColor(pal["bg_main"]).blueF(), 1.0)
+            f.glClear(f.GL_COLOR_BUFFER_BIT | f.GL_DEPTH_BUFFER_BIT)
+            f.glEnable(f.GL_DEPTH_TEST)
+
+            self.gl_program.bind()
+            cam = self._cam_matrix()
+            proj = QMatrix4x4()
+            aspect = self.width() / max(1, self.height())
+            proj.perspective(45.0, aspect, 0.1, 100.0)
+            vp = proj * cam
+
+            fk = self._compute_fk()
+            self._draw_hardware(vp, fk, pal)
+
+            self.gl_program.release()
+            f.glDisable(f.GL_DEPTH_TEST)
+
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            self._draw_labels(painter, pal, fk)
+            self._draw_hud(painter, pal)
+            painter.end()
+        else:
+            # Software Rendering
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.fillRect(self.rect(), QColor(pal["bg_main"]))
+
+            if not self._links:
+                painter.setPen(QColor(pal["text_dim"]))
+                painter.setFont(QFont("Segoe UI", 13))
+                painter.drawText(
+                    self.rect(), Qt.AlignCenter,
+                    "Select a URDF / Xacro file\nto view the robot in 3-D",
+                )
+                painter.end()
+                return
+
+            self._draw_grid(painter, pal)
+            self._draw_axes(painter)
+
+            fk = self._compute_fk()
+            self._draw_robot(painter, pal, fk)
+            self._draw_labels(painter, pal, fk)
+            self._draw_hud(painter, pal)
+            painter.end()
 
     # ── grid / axes ─────────────────────────────────────────────────────────
 
@@ -762,6 +839,76 @@ class URDFViewport3D(QOpenGLWidget):
             ptr.drawText(int(e[0]) + 4, int(e[1]) - 4, lbl)
 
     # ── robot geometry ──────────────────────────────────────────────────────
+
+    def _draw_hardware(self, vp, fk, pal: dict) -> None:
+        import ctypes
+        import math
+        
+        # We need a flat array of: x, y, z, nx, ny, nz, r, g, b
+        floats = []
+        
+        base_color = QColor(pal["accent"])
+        mesh_color = QColor(pal["info"])
+        
+        for name, link in self._links.items():
+            if name not in fk:
+                continue
+            link_tf = fk[name]
+            vis_tf = _TF.from_xyz_rpy(link.visual_xyz, link.visual_rpy)
+            full_tf = link_tf.chain(vis_tf)
+            
+            gt = link.geometry_type
+            gs = link.geometry_size
+            if gt == "box" and len(gs) >= 3:
+                faces = _box_faces(gs[0], gs[1], gs[2], base_color)
+            elif gt == "cylinder" and len(gs) >= 2:
+                faces = _cylinder_faces(gs[0], gs[1], base_color)
+            elif gt == "sphere" and len(gs) >= 1:
+                faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
+            elif gt == "mesh":
+                if link.mesh_faces:
+                    faces = link.mesh_faces
+                else:
+                    faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
+            else:
+                continue
+                
+            flat = [full_tf.matrix[r][c] for r in range(4) for c in range(4)]
+            model = QMatrix4x4(*flat)
+                    
+            self.gl_program.setUniformValue("model", model)
+            self.gl_program.setUniformValue("mvp", vp * model)
+            
+            # Pack faces into floats
+            v_data = []
+            for face in faces:
+                for v in face.pts:
+                    v_data.extend([v[0], v[1], v[2]])
+                    v_data.extend([face.norm[0], face.norm[1], face.norm[2]])
+                    v_data.extend([face.col.redF(), face.col.greenF(), face.col.blueF()])
+            
+            if not v_data:
+                continue
+                
+            arr = (ctypes.c_float * len(v_data))(*v_data)
+            self.gl_vbo.bind()
+            self.gl_vbo.allocate(arr, len(v_data) * 4)
+            
+            pos_loc = self.gl_program.attributeLocation("position")
+            norm_loc = self.gl_program.attributeLocation("normal")
+            col_loc = self.gl_program.attributeLocation("color")
+            
+            self.gl_program.enableAttributeArray(pos_loc)
+            self.gl_program.enableAttributeArray(norm_loc)
+            self.gl_program.enableAttributeArray(col_loc)
+            
+            stride = 9 * 4
+            self.gl_program.setAttributeBuffer(pos_loc, self.gl_funcs.GL_FLOAT, 0, 3, stride)
+            self.gl_program.setAttributeBuffer(norm_loc, self.gl_funcs.GL_FLOAT, 3 * 4, 3, stride)
+            self.gl_program.setAttributeBuffer(col_loc, self.gl_funcs.GL_FLOAT, 6 * 4, 3, stride)
+            
+            self.gl_funcs.glDrawArrays(self.gl_funcs.GL_TRIANGLES, 0, len(v_data) // 9)
+            self.gl_vbo.release()
 
     def _draw_robot(
         self, ptr: QPainter, pal: dict, fk: Dict[str, _TF]
