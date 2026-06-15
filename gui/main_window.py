@@ -244,21 +244,21 @@ class ProcessLogReader(QThread):
 
 _NAV_ENTRIES = [
     # (page_id, attr_name,   label,            icon_name,             refresh_method_or_None)
-    (0, "btn_workspace",      "Workspace",         "fa5s.folder-open",    None),
-    (1, "btn_packages",       "Packages",          "fa5s.box",            None),
-    (2, "btn_nodes",          "Nodes",             "fa5s.microchip",      "_refresh_nodes_list"),
-    (3, "btn_topics",         "Topic Inspector",   "fa5s.satellite-dish", "_refresh_topics"),
-    (4, "btn_launch",         "Launch Manager",    "fa5s.rocket",         "_refresh_launch"),
-    (5, "btn_services",       "Service Inspector", "fa5s.handshake",      "_refresh_services"),
-    (6, "btn_actions",        "Action Inspector",  "fa5s.bullseye",       "_refresh_actions"),
-    (7, "btn_logs",           "Log Viewer",        "fa5s.file-alt",       "_refresh_logs"),
-    (8, "btn_troubleshooter", "DDS Troubleshooter","fa5s.network-wired",  None),
-    (9, "btn_params",         "Parameters",        "fa5s.sliders-h",      "_refresh_params"),
-    (10, "btn_visualizer",     "Visualizer",        "fa5s.project-diagram","_refresh_visualizer"),
-    (11, "btn_bags",           "Bag Manager",       "fa5s.database",       "_refresh_bags"),
-    (12, "btn_urdf",          "URDF Viewer",       "fa5s.cubes",          "_refresh_urdf"),
-    (13, "btn_tools",         "Tools Hub",         "fa5s.tools",          "_refresh_tools"),
-    (14, "btn_settings",      "Settings",          "fa5s.cog",            None),
+    (0, "btn_workspace",      "Workspace",                             "fa5s.folder-open",    None),
+    (1, "btn_packages",       "Packages",                              "fa5s.box",            None),
+    (2, "btn_nodes",          "Nodes",                                 "fa5s.microchip",      "_refresh_nodes_list"),
+    (3, "btn_topics",         "Topic Inspector",                       "fa5s.satellite-dish", "_refresh_topics"),
+    (10, "btn_visualizer",    "Visualizer",                            "fa5s.project-diagram","_refresh_visualizer"),
+    (4, "btn_launch",         "Launch Manager",                        "fa5s.rocket",         "_refresh_launch"),
+    (12, "btn_urdf",          "URDF Viewer (Beta)",                    "fa5s.cubes",          "_refresh_urdf"),
+    (11, "btn_bags",          "Bag Manager",                           "fa5s.database",       "_refresh_bags"),
+    (7, "btn_logs",           "Log Viewer",                            "fa5s.file-alt",       "_refresh_logs"),
+    (13, "btn_tools",         "Tools Hub (Beta)",                      "fa5s.tools",          "_refresh_tools"),
+    (5, "btn_services",       "Service Inspector (Beta)",              "fa5s.handshake",      "_refresh_services"),
+    (6, "btn_actions",        "Action Inspector (Beta)",               "fa5s.bullseye",       "_refresh_actions"),
+    (8, "btn_troubleshooter", "DDS Troubleshooter (Beta)",             "fa5s.network-wired",  None),
+    (9, "btn_params",         "Parameters",                            "fa5s.sliders-h",      "_refresh_params"),
+    (14, "btn_settings",      "Settings",                              "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -568,10 +568,11 @@ class MainWindow(QMainWindow):
             theme = settings.get("theme", "dark")
             self._on_theme_changed(theme)
             
-            # 3. Tab Visibility
+            # 3. Tab Visibility & Order
             vis_dict = settings.get("tab_visibility", {})
-            if vis_dict and hasattr(self, "settings_page"):
-                self.settings_page.set_tab_visibility(vis_dict)
+            order_list = settings.get("tab_order", [])
+            if hasattr(self, "settings_page"):
+                self.settings_page.set_tab_state(vis_dict, order_list)
                 self._apply_tab_visibility()
 
             # 4. OpenGL Setting
@@ -596,6 +597,7 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, "settings_page"):
             settings["tab_visibility"] = self.settings_page.tab_visibility()
+            settings["tab_order"] = self.settings_page.tab_order()
             settings["use_opengl"] = self.settings_page.is_opengl_enabled()
             
         try:
@@ -660,6 +662,11 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self._nav_buttons: dict[str, QPushButton] = {}
+        
+        self.nav_layout = QVBoxLayout()
+        self.nav_layout.setContentsMargins(0, 0, 0, 0)
+        self.nav_layout.setSpacing(4)
+        sb_lay.addLayout(self.nav_layout)
 
         for page_id, attr, label, icon_name, _ in _NAV_ENTRIES:
             btn = self._create_nav_button(page_id, label, icon_name)
@@ -668,19 +675,19 @@ class MainWindow(QMainWindow):
             if attr == "btn_topics":
                 btn.setObjectName("nav_btn_inspector")
 
-            # Tools Hub & Settings get pushed to bottom
             if attr == "btn_tools":
                 sb_lay.addStretch()
                 # thin divider
                 div = QFrame()
                 div.setFixedHeight(1)
-                div.setStyleSheet(
-                    "background-color: palette(shadow); margin: 0 16px;"
-                )
+                div.setStyleSheet("background-color: palette(shadow); margin: 0 16px;")
                 sb_lay.addWidget(div)
                 sb_lay.addSpacing(4)
-
-            sb_lay.addWidget(btn)
+                sb_lay.addWidget(btn)
+            elif attr == "btn_settings":
+                sb_lay.addWidget(btn)
+            else:
+                self.nav_layout.addWidget(btn)
 
         sb_lay.addSpacing(8)
         self.main_layout.addWidget(self.sidebar)
@@ -1142,6 +1149,7 @@ class MainWindow(QMainWindow):
         page = SettingsPage(self)
         page.theme_changed.connect(self._on_theme_changed)
         page.tab_visibility_changed.connect(self._apply_tab_visibility)
+        page.tab_order_changed.connect(self._apply_tab_visibility)
         page.opengl_setting_changed.connect(self._apply_opengl_setting)
         page.save_requested.connect(self._force_save_settings)
         return page
@@ -1183,16 +1191,50 @@ class MainWindow(QMainWindow):
 
     def _apply_tab_visibility(self):
         vis = self.settings_page.tab_visibility()
+        order = self.settings_page.tab_order()
+        
+        attr_by_key = {v: k for k, v in _TAB_KEY_FOR_BTN.items()}
+        
+        # 1. Hide/Show
         for page_id, attr, _label, _icon, _ in _NAV_ENTRIES:
             btn = self._nav_buttons.get(attr)
             if btn is None:
                 continue
             key = _TAB_KEY_FOR_BTN.get(attr, "")
-            # Settings and Workspace are always visible
             if key in ("settings", "workspace"):
                 btn.setVisible(True)
             else:
                 btn.setVisible(vis.get(key, True))
+                
+        # 2. Reorder Nav Layout
+        for attr, btn in self._nav_buttons.items():
+            if attr not in ("btn_settings", "btn_tools"):
+                self.nav_layout.removeWidget(btn)
+                
+        added_attrs = set()
+        
+        # Workspace is permanently anchored at the top of the layout
+        btn_workspace = self._nav_buttons.get("btn_workspace")
+        if btn_workspace:
+            self.nav_layout.addWidget(btn_workspace)
+            added_attrs.add("btn_workspace")
+            
+        for key in order:
+            if key in ("settings", "workspace", "tools"):
+                continue
+            attr = attr_by_key.get(key)
+            if attr:
+                btn = self._nav_buttons.get(attr)
+                if btn:
+                    self.nav_layout.addWidget(btn)
+                    added_attrs.add(attr)
+                    
+        # Fallback for missing entries
+        for page_id, attr, _, _, _ in _NAV_ENTRIES:
+            if attr not in ("btn_settings", "btn_tools") and attr not in added_attrs:
+                btn = self._nav_buttons.get(attr)
+                if btn:
+                    self.nav_layout.addWidget(btn)
 
     def _apply_opengl_setting(self, use_opengl: bool):
         if hasattr(self, "urdf_page") and hasattr(self.urdf_page, "set_use_opengl"):

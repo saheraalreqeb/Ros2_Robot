@@ -148,6 +148,11 @@ QStackedWidget {{
     background-color: {bg_main};
 }}
 
+/* ── Text properties ─────────────────────────────────────────────────── */
+QLabel[class="text-primary"] {{ color: {text_primary}; }}
+QLabel[class="text-secondary"] {{ color: {text_secondary}; }}
+QLabel[class="text-dim"] {{ color: {text_dim}; }}
+
 /* ── Page headings ───────────────────────────────────────────────────── */
 QLabel[class="h1"] {{
     font-size: 24px;
