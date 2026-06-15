@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 import os
 import re
+import struct
 import subprocess
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Tuple
@@ -234,6 +235,287 @@ def _sphere_faces(
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Mesh loaders (STL, DAE) + package:// resolver
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+_MAX_MESH_TRIS = 3000  # subsample dense meshes for performance
+
+
+def _resolve_mesh_path(
+    filename: str, urdf_dir: str, workspace_root: str
+) -> Optional[str]:
+    """
+    Resolve a URDF mesh ``filename`` attribute to an absolute path.
+
+    Handles:
+      • ``package://pkg_name/rel/path``  → search workspace for pkg_name
+      • ``file:///abs/path``             → strip scheme
+      • bare relative path               → resolve relative to urdf_dir
+    """
+    if filename.startswith("package://"):
+        rest = filename[len("package://"):]
+        pkg_name, _, rel_path = rest.partition("/")
+        # Search workspace src/ for the package directory
+        src_root = os.path.join(workspace_root, "src")
+        if not os.path.isdir(src_root):
+            src_root = workspace_root
+        for dirpath, dirnames, fnames in os.walk(src_root):
+            if os.path.basename(dirpath) == pkg_name:
+                candidate = os.path.join(dirpath, rel_path)
+                if os.path.isfile(candidate):
+                    return candidate
+            # Also check by package.xml
+            if "package.xml" in fnames:
+                try:
+                    pxml = ET.parse(os.path.join(dirpath, "package.xml"))
+                    name_el = pxml.find("name")
+                    if name_el is not None and name_el.text and name_el.text.strip() == pkg_name:
+                        candidate = os.path.join(dirpath, rel_path)
+                        if os.path.isfile(candidate):
+                            return candidate
+                except Exception:
+                    pass
+        return None
+
+    if filename.startswith("file://"):
+        return filename[7:]
+
+    # Relative path
+    candidate = os.path.join(urdf_dir, filename)
+    if os.path.isfile(candidate):
+        return candidate
+    return None
+
+
+def _load_stl(path: str) -> List[List[List[float]]]:
+    """
+    Parse an STL file (binary or ASCII) and return a list of triangles.
+    Each triangle is ``[[x1,y1,z1], [x2,y2,z2], [x3,y3,z3]]``.
+    """
+    with open(path, "rb") as f:
+        header = f.read(80)
+        # Detect ASCII vs binary: ASCII starts with "solid" and contains
+        # "facet" / "endsolid" as text.
+        f.seek(0)
+        probe = f.read(min(256, os.path.getsize(path)))
+        f.seek(0)
+
+    is_ascii = (
+        probe.lstrip().startswith(b"solid")
+        and b"facet" in probe
+        and b"vertex" in probe
+    )
+
+    if is_ascii:
+        return _load_stl_ascii(path)
+    else:
+        return _load_stl_binary(path)
+
+
+def _load_stl_binary(path: str) -> List[List[List[float]]]:
+    tris: List[List[List[float]]] = []
+    with open(path, "rb") as f:
+        f.read(80)  # header
+        data = f.read(4)
+        if len(data) < 4:
+            return tris
+        count = struct.unpack("<I", data)[0]
+        for _ in range(count):
+            rec = f.read(50)  # 12 normal + 36 verts + 2 attr
+            if len(rec) < 50:
+                break
+            vals = struct.unpack("<12f", rec[:48])
+            # vals: nx,ny,nz, v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z
+            v1 = [vals[3], vals[4], vals[5]]
+            v2 = [vals[6], vals[7], vals[8]]
+            v3 = [vals[9], vals[10], vals[11]]
+            tris.append([v1, v2, v3])
+    return tris
+
+
+def _load_stl_ascii(path: str) -> List[List[List[float]]]:
+    tris: List[List[List[float]]] = []
+    with open(path, "r", errors="replace") as f:
+        verts: List[List[float]] = []
+        for line in f:
+            stripped = line.strip()
+            if stripped.startswith("vertex"):
+                parts = stripped.split()
+                if len(parts) >= 4:
+                    try:
+                        verts.append([float(parts[1]), float(parts[2]), float(parts[3])])
+                    except ValueError:
+                        pass
+            elif stripped.startswith("endfacet"):
+                if len(verts) >= 3:
+                    tris.append(verts[:3])
+                verts = []
+    return tris
+
+
+def _load_dae(path: str) -> List[List[List[float]]]:
+    """
+    Basic Collada (.dae) triangle loader.
+
+    Parses ``<mesh>`` elements to extract vertex positions and triangle indices.
+    Supports ``<triangles>`` and ``<polylist>`` with triangular polygons.
+    """
+    tris: List[List[List[float]]] = []
+    try:
+        tree = ET.parse(path)
+    except Exception:
+        return tris
+
+    root = tree.getroot()
+    # Handle Collada namespace
+    ns = ""
+    if root.tag.startswith("{"):
+        ns = root.tag.split("}")[0] + "}"
+
+    for geom in root.iter(f"{ns}geometry"):
+        mesh_el = geom.find(f"{ns}mesh")
+        if mesh_el is None:
+            continue
+
+        # Collect <source> float arrays indexed by their id
+        sources: Dict[str, List[float]] = {}
+        for src in mesh_el.findall(f"{ns}source"):
+            src_id = src.get("id", "")
+            fa = src.find(f"{ns}float_array")
+            if fa is not None and fa.text:
+                try:
+                    sources[src_id] = [float(v) for v in fa.text.split()]
+                except ValueError:
+                    pass
+
+        # Resolve <vertices> input to find the position source
+        pos_source_id = ""
+        verts_el = mesh_el.find(f"{ns}vertices")
+        if verts_el is not None:
+            for inp in verts_el.findall(f"{ns}input"):
+                if inp.get("semantic") == "POSITION":
+                    ref = inp.get("source", "")
+                    pos_source_id = ref.lstrip("#")
+                    break
+
+        pos_array = sources.get(pos_source_id, [])
+        if not pos_array:
+            # Fallback: try first source
+            for sid, arr in sources.items():
+                if len(arr) >= 9:  # at least 3 vertices
+                    pos_array = arr
+                    break
+        if not pos_array:
+            continue
+
+        # Build vertex list
+        vertices: List[List[float]] = []
+        for i in range(0, len(pos_array) - 2, 3):
+            vertices.append([pos_array[i], pos_array[i + 1], pos_array[i + 2]])
+
+        # Process <triangles>
+        for tri_el in mesh_el.findall(f"{ns}triangles"):
+            # Find the VERTEX input offset
+            vert_offset = 0
+            max_offset = 0
+            for inp in tri_el.findall(f"{ns}input"):
+                off = int(inp.get("offset", "0"))
+                max_offset = max(max_offset, off)
+                if inp.get("semantic") == "VERTEX":
+                    vert_offset = off
+            stride = max_offset + 1
+
+            p_el = tri_el.find(f"{ns}p")
+            if p_el is None or not p_el.text:
+                continue
+            try:
+                indices = [int(x) for x in p_el.text.split()]
+            except ValueError:
+                continue
+
+            for i in range(0, len(indices) - stride * 2, stride * 3):
+                i0 = indices[i + vert_offset]
+                i1 = indices[i + stride + vert_offset]
+                i2 = indices[i + stride * 2 + vert_offset]
+                if i0 < len(vertices) and i1 < len(vertices) and i2 < len(vertices):
+                    tris.append([list(vertices[i0]), list(vertices[i1]), list(vertices[i2])])
+
+        # Process <polylist> (common in some DAE exporters)
+        for poly_el in mesh_el.findall(f"{ns}polylist"):
+            vert_offset = 0
+            max_offset = 0
+            for inp in poly_el.findall(f"{ns}input"):
+                off = int(inp.get("offset", "0"))
+                max_offset = max(max_offset, off)
+                if inp.get("semantic") == "VERTEX":
+                    vert_offset = off
+            stride = max_offset + 1
+
+            vcount_el = poly_el.find(f"{ns}vcount")
+            p_el = poly_el.find(f"{ns}p")
+            if vcount_el is None or p_el is None:
+                continue
+            if not vcount_el.text or not p_el.text:
+                continue
+            try:
+                vcounts = [int(x) for x in vcount_el.text.split()]
+                indices = [int(x) for x in p_el.text.split()]
+            except ValueError:
+                continue
+
+            idx = 0
+            for vc in vcounts:
+                if vc >= 3:
+                    # Fan-triangulate the polygon
+                    base_i = indices[idx + vert_offset] if idx + vert_offset < len(indices) else 0
+                    for t in range(1, vc - 1):
+                        off1 = idx + t * stride + vert_offset
+                        off2 = idx + (t + 1) * stride + vert_offset
+                        if off2 < len(indices):
+                            i0, i1, i2 = base_i, indices[off1], indices[off2]
+                            if i0 < len(vertices) and i1 < len(vertices) and i2 < len(vertices):
+                                tris.append([list(vertices[i0]), list(vertices[i1]), list(vertices[i2])])
+                idx += vc * stride
+
+    return tris
+
+
+def _load_mesh_file(path: str) -> List[List[List[float]]]:
+    """Load a mesh file (STL or DAE) and return triangle list."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".stl":
+        return _load_stl(path)
+    elif ext in (".dae", ".collada"):
+        return _load_dae(path)
+    return []
+
+
+def _tris_to_faces(
+    tris: List[List[List[float]]],
+    scale: List[float],
+    color: QColor,
+    max_tris: int = _MAX_MESH_TRIS,
+) -> List[Face]:
+    """Convert raw triangles to renderable Face list, with decimation."""
+    if not tris:
+        return []
+
+    # Subsample if too dense
+    if len(tris) > max_tris:
+        step = len(tris) / max_tris
+        tris = [tris[int(i * step)] for i in range(max_tris)]
+
+    faces: List[Face] = []
+    sx, sy, sz = scale
+    for tri in tris:
+        if len(tri) < 3:
+            continue
+        scaled = [[v[0] * sx, v[1] * sy, v[2] * sz] for v in tri]
+        faces.append((scaled, color))
+    return faces
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  URDF data structures
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -250,6 +532,10 @@ class URDFLink:
         self.geometry_size: tuple = ()
         self.visual_xyz: List[float] = [0.0, 0.0, 0.0]
         self.visual_rpy: List[float] = [0.0, 0.0, 0.0]
+        # Mesh-specific fields
+        self.mesh_filename: str = ""          # raw filename attr from URDF
+        self.mesh_scale: List[float] = [1.0, 1.0, 1.0]
+        self.mesh_faces: Optional[List[Face]] = None  # cached loaded faces
 
 
 class URDFJoint:
@@ -496,7 +782,10 @@ class URDFViewport3D(QOpenGLWidget):
             elif gt == "sphere" and len(gs) >= 1:
                 faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
             elif gt == "mesh":
-                faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
+                if link.mesh_faces:
+                    faces = link.mesh_faces
+                else:
+                    faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
             else:
                 # No visual geometry → tiny marker
                 faces = _sphere_faces(0.012, none_col, rings=3, segs=4)
@@ -1069,6 +1358,7 @@ class URDFViewerPage(QWidget):
             self.viewport3d.clear()
             return
 
+        self._load_meshes()
         self._build_tree()
         self._refresh_diagram()
         self._rebuild_joint_panel()
@@ -1139,13 +1429,13 @@ class URDFViewerPage(QWidget):
                             pass
                     elif mesh is not None:
                         lk.geometry_type = "mesh"
-                        # Try to extract scale for approximate sizing
+                        lk.mesh_filename = mesh.get("filename", "")
                         sc = mesh.get("scale", "1 1 1").split()
                         try:
-                            s = max(float(x) for x in sc[:3])
-                            lk.geometry_size = (0.05 * s, 0.05 * s, 0.05 * s)
+                            lk.mesh_scale = [float(x) for x in sc[:3]]
                         except ValueError:
-                            lk.geometry_size = (0.05, 0.05, 0.05)
+                            lk.mesh_scale = [1.0, 1.0, 1.0]
+                        lk.geometry_size = tuple(lk.mesh_scale)
             self.links[name] = lk
 
     def _extract_joints(self, robot: ET.Element) -> None:
@@ -1195,6 +1485,35 @@ class URDFViewerPage(QWidget):
                     pass
 
             self.joints.append(j)
+
+    # ── mesh loading ────────────────────────────────────────────────────────
+
+    def _load_meshes(self) -> None:
+        """Resolve and load mesh files for all links with geometry_type=='mesh'."""
+        if not self.active_file:
+            return
+        urdf_dir = os.path.dirname(self.active_file)
+        accent = QColor(ThemeManager.palette()["accent"])
+
+        for link in self.links.values():
+            if link.geometry_type != "mesh" or not link.mesh_filename:
+                continue
+
+            resolved = _resolve_mesh_path(
+                link.mesh_filename, urdf_dir, self.workspace_path
+            )
+            if resolved is None:
+                continue
+
+            try:
+                tris = _load_mesh_file(resolved)
+            except Exception:
+                continue
+
+            if tris:
+                link.mesh_faces = _tris_to_faces(
+                    tris, link.mesh_scale, accent
+                )
 
     # ── hierarchy tree ──────────────────────────────────────────────────────
 
