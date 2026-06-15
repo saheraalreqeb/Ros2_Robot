@@ -982,7 +982,7 @@ class URDFViewport3D(QOpenGLWidget):
             elif gt == "sphere" and len(gs) >= 1:
                 faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
             elif gt == "mesh":
-                is_moving = self._drag_mode is not None or self._is_interacting
+                is_moving = self._is_interacting
                 if force_high_quality:
                     is_moving = False
                 if force_low_quality:
@@ -1102,6 +1102,12 @@ class URDFViewport3D(QOpenGLWidget):
         self._drag_mode = "orbit" if ev.button() == Qt.LeftButton else "pan"
         self._drag_start = ev.position()
         self._drag_snap = (self._az, self._el, self._pan_x, self._pan_y)
+        self._fade_anim_timer.stop()
+        self._fade_progress = 1.0
+        self._fade_pixmap = None
+        self._is_interacting = True
+        self._interaction_timer.start(150)
+        self.update()
 
     def mouseMoveEvent(self, ev) -> None:  # noqa: N802
         if not self._drag_mode or not self._drag_start:
@@ -1115,6 +1121,12 @@ class URDFViewport3D(QOpenGLWidget):
         else:
             self._pan_x = px0 + dx
             self._pan_y = py0 + dy
+            
+        self._fade_anim_timer.stop()
+        self._fade_progress = 1.0
+        self._fade_pixmap = None
+        self._is_interacting = True
+        self._interaction_timer.start(150)
         self.update()
 
     def mouseReleaseEvent(self, _ev) -> None:  # noqa: N802
@@ -1123,6 +1135,11 @@ class URDFViewport3D(QOpenGLWidget):
     def wheelEvent(self, ev) -> None:  # noqa: N802
         f = 1.15 if ev.angleDelta().y() > 0 else 1 / 1.15
         self._zoom = max(0.05, min(20.0, self._zoom * f))
+        self._fade_anim_timer.stop()
+        self._fade_progress = 1.0
+        self._fade_pixmap = None
+        self._is_interacting = True
+        self._interaction_timer.start(150)
         self.update()
 
     def mouseDoubleClickEvent(self, _ev) -> None:  # noqa: N802
