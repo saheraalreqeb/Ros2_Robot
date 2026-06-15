@@ -573,6 +573,12 @@ class MainWindow(QMainWindow):
             if vis_dict and hasattr(self, "settings_page"):
                 self.settings_page.set_tab_visibility(vis_dict)
                 self._apply_tab_visibility()
+
+            # 4. OpenGL Setting
+            use_opengl = settings.get("use_opengl", False)
+            if hasattr(self, "settings_page"):
+                self.settings_page.set_opengl_enabled(use_opengl)
+            self._apply_opengl_setting(use_opengl)
         except Exception:
             pass
         finally:
@@ -590,6 +596,7 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, "settings_page"):
             settings["tab_visibility"] = self.settings_page.tab_visibility()
+            settings["use_opengl"] = self.settings_page.is_opengl_enabled()
             
         try:
             with open(self._get_settings_path(), "w", encoding="utf-8") as f:
@@ -1135,6 +1142,7 @@ class MainWindow(QMainWindow):
         page = SettingsPage(self)
         page.theme_changed.connect(self._on_theme_changed)
         page.tab_visibility_changed.connect(self._apply_tab_visibility)
+        page.opengl_setting_changed.connect(self._apply_opengl_setting)
         page.save_requested.connect(self._force_save_settings)
         return page
 
@@ -1185,6 +1193,10 @@ class MainWindow(QMainWindow):
                 btn.setVisible(True)
             else:
                 btn.setVisible(vis.get(key, True))
+
+    def _apply_opengl_setting(self, use_opengl: bool):
+        if hasattr(self, "urdf_page") and hasattr(self.urdf_page, "set_use_opengl"):
+            self.urdf_page.set_use_opengl(use_opengl)
 
     def _attach_help_button_to_page(self, page_id: int, page: QWidget):
         # Create local help button

@@ -595,9 +595,24 @@ class URDFViewport3D(QOpenGLWidget):
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.update)
 
+        self._is_interacting = False
+        self._interaction_timer = QTimer(self)
+        self._interaction_timer.setSingleShot(True)
+        self._interaction_timer.timeout.connect(self._on_interaction_end)
+
+        self._use_opengl = False
+
         self.setMinimumSize(QSize(300, 220))
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def set_use_opengl(self, enabled: bool) -> None:
+        self._use_opengl = enabled
+        self.update()
+
+    def _on_interaction_end(self) -> None:
+        self._is_interacting = False
+        self.update()
 
     # ── public API ──────────────────────────────────────────────────────────
 
@@ -614,6 +629,8 @@ class URDFViewport3D(QOpenGLWidget):
             if j.name == joint_name:
                 j.current_angle = angle
                 break
+        self._is_interacting = True
+        self._interaction_timer.start(150)
         self._timer.start(16)
 
     def clear(self) -> None:
@@ -782,7 +799,11 @@ class URDFViewport3D(QOpenGLWidget):
             elif gt == "sphere" and len(gs) >= 1:
                 faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
             elif gt == "mesh":
-                if link.mesh_faces:
+                is_moving = self._drag_mode is not None or self._is_interacting
+                if is_moving and not self._use_opengl:
+                    # Adaptive Degradation: draw bounding box instead of heavy mesh
+                    faces = _box_faces(0.1, 0.1, 0.1, mesh_color)
+                elif link.mesh_faces:
                     faces = link.mesh_faces
                 else:
                     faces = _box_faces(0.06, 0.06, 0.06, mesh_color)
