@@ -602,6 +602,11 @@ class URDFViewport3D(QOpenGLWidget):
 
         self._use_opengl = False
         self._gl_initialized = False
+        
+        self._fade_progress = 1.0
+        self._fade_pixmap = None
+        self._fade_anim_timer = QTimer(self)
+        self._fade_anim_timer.timeout.connect(self._on_fade_step)
 
         self.setMinimumSize(QSize(300, 220))
         self.setMouseTracking(True)
@@ -613,6 +618,26 @@ class URDFViewport3D(QOpenGLWidget):
 
     def _on_interaction_end(self) -> None:
         self._is_interacting = False
+        if not self._use_opengl:
+            from PySide6.QtGui import QPixmap, QPainter
+            self._fade_pixmap = QPixmap(self.size())
+            self._fade_pixmap.fill(Qt.transparent)
+            ptr = QPainter(self._fade_pixmap)
+            ptr.setRenderHint(QPainter.Antialiasing)
+            fk = self._compute_fk()
+            self._draw_robot(ptr, ThemeManager.palette(), fk, force_high_quality=True)
+            ptr.end()
+            self._fade_progress = 0.0
+            self._fade_anim_timer.start(16)
+        else:
+            self.update()
+
+    def _on_fade_step(self) -> None:
+        self._fade_progress += 0.08
+        if self._fade_progress >= 1.0:
+            self._fade_progress = 1.0
+            self._fade_anim_timer.stop()
+            self._fade_pixmap = None
         self.update()
 
     # ── public API ──────────────────────────────────────────────────────────
@@ -630,6 +655,9 @@ class URDFViewport3D(QOpenGLWidget):
             if j.name == joint_name:
                 j.current_angle = angle
                 break
+        self._fade_anim_timer.stop()
+        self._fade_progress = 1.0
+        self._fade_pixmap = None
         self._is_interacting = True
         self._interaction_timer.start(150)
         self._timer.start(16)
@@ -805,7 +833,14 @@ class URDFViewport3D(QOpenGLWidget):
             self._draw_axes(painter)
 
             fk = self._compute_fk()
-            self._draw_robot(painter, pal, fk)
+            if self._fade_progress < 1.0 and self._fade_pixmap:
+                self._draw_robot(painter, pal, fk, force_low_quality=True)
+                painter.setOpacity(self._fade_progress)
+                painter.drawPixmap(0, 0, self._fade_pixmap)
+                painter.setOpacity(1.0)
+            else:
+                self._draw_robot(painter, pal, fk)
+                
             self._draw_labels(painter, pal, fk)
             self._draw_hud(painter, pal)
             painter.end()
@@ -911,7 +946,8 @@ class URDFViewport3D(QOpenGLWidget):
             self.gl_vbo.release()
 
     def _draw_robot(
-        self, ptr: QPainter, pal: dict, fk: Dict[str, _TF]
+        self, ptr: QPainter, pal: dict, fk: Dict[str, _TF],
+        force_high_quality: bool = False, force_low_quality: bool = False
     ) -> None:
         cam = self._cam_matrix()
 
@@ -936,7 +972,7 @@ class URDFViewport3D(QOpenGLWidget):
             vis_tf = _TF.from_xyz_rpy(link.visual_xyz, link.visual_rpy)
             full_tf = link_tf.chain(vis_tf)
 
-            # Choose geometry
+            render_type = "poly"
             gt = link.geometry_type
             gs = link.geometry_size
             if gt == "box" and len(gs) >= 3:
@@ -947,9 +983,17 @@ class URDFViewport3D(QOpenGLWidget):
                 faces = _sphere_faces(gs[0], base_color, rings=6, segs=8)
             elif gt == "mesh":
                 is_moving = self._drag_mode is not None or self._is_interacting
+                if force_high_quality:
+                    is_moving = False
+                if force_low_quality:
+                    is_moving = True
+                    
                 if is_moving and not self._use_opengl:
-                    # Adaptive Degradation: draw bounding box instead of heavy mesh
-                    faces = _box_faces(0.1, 0.1, 0.1, mesh_color)
+                    # Approach C: Semi-transparent wireframe silhouette
+                    box_col = QColor(mesh_color)
+                    box_col.setAlpha(150)
+                    faces = _box_faces(0.1, 0.1, 0.1, box_col)
+                    render_type = "wireframe"
                 elif link.mesh_faces:
                     faces = link.mesh_faces
                 else:
@@ -992,7 +1036,7 @@ class URDFViewport3D(QOpenGLWidget):
                 proj = [self._project(w) for w in world]
                 avg_d = sum(p[2] for p in proj) / len(proj)
                 poly = [(p[0], p[1]) for p in proj]
-                bucket.append((avg_d, poly, fc, "poly"))
+                bucket.append((avg_d, poly, fc, render_type))
 
         # Joint connection rods
         c2j = {j.child: j for j in self._joints}
@@ -1006,11 +1050,18 @@ class URDFViewport3D(QOpenGLWidget):
                     (avg, [(a[0], a[1]), (b[0], b[1])], jc, "line")
                 )
 
-        # Depth sort (painter's algorithm: far first)
-        bucket.sort(key=lambda f: -f[0])
-
-        for _, poly, col, kind in bucket:
-            if kind == "line":
+        # Sort and draw
+        bucket.sort(key=lambda x: x[0], reverse=True)
+        for _, poly, col, r_type in bucket:
+            if r_type == "poly":
+                ptr.setPen(Qt.NoPen)
+                ptr.setBrush(col)
+                ptr.drawPolygon([QPointF(x, y) for x, y in poly])
+            elif r_type == "wireframe":
+                ptr.setPen(QPen(col, 1))
+                ptr.setBrush(Qt.NoBrush)
+                ptr.drawPolygon([QPointF(x, y) for x, y in poly])
+            elif r_type == "line":
                 ptr.setPen(QPen(col, 2))
                 ptr.setBrush(Qt.NoBrush)
                 ptr.drawLine(
@@ -1022,11 +1073,6 @@ class URDFViewport3D(QOpenGLWidget):
                 ptr.setBrush(QBrush(col))
                 ptr.setPen(Qt.NoPen)
                 ptr.drawEllipse(mx - 3, my - 3, 6, 6)
-            else:
-                qpoly = QPolygonF([QPointF(x, y) for x, y in poly])
-                ptr.setPen(QPen(col.darker(130), 1))
-                ptr.setBrush(QBrush(col))
-                ptr.drawPolygon(qpoly)
 
     def _draw_labels(
         self, ptr: QPainter, pal: dict, fk: Dict[str, _TF]
