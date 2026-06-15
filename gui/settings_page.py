@@ -32,6 +32,7 @@ class SettingsPage(QWidget):
 
     theme_changed: Signal = Signal(str)
     tab_visibility_changed: Signal = Signal()
+    opengl_setting_changed: Signal = Signal(bool)
     save_requested: Signal = Signal()
 
     # Tabs the user can show / hide.
@@ -58,6 +59,7 @@ class SettingsPage(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._tab_checks: dict[str, QCheckBox] = {}
+        self._chk_opengl: QCheckBox | None = None
         self._build_ui()
 
     # ── public ────────────────────────────────────────────────────────────────
@@ -74,6 +76,16 @@ class SettingsPage(QWidget):
                 cb.setChecked(state[key])
                 cb.blockSignals(False)
         self.tab_visibility_changed.emit()
+
+    def is_opengl_enabled(self) -> bool:
+        return self._chk_opengl.isChecked() if self._chk_opengl else False
+
+    def set_opengl_enabled(self, enabled: bool) -> None:
+        if self._chk_opengl:
+            self._chk_opengl.blockSignals(True)
+            self._chk_opengl.setChecked(enabled)
+            self._chk_opengl.blockSignals(False)
+            self.opengl_setting_changed.emit(enabled)
 
     # ── build UI ──────────────────────────────────────────────────────────────
 
@@ -147,6 +159,39 @@ class SettingsPage(QWidget):
 
         theme_btn_row.addStretch()
         theme_lay.addLayout(theme_btn_row)
+
+        # Rendering options
+        theme_lay.addSpacing(10)
+        rend_label = QLabel("3D Rendering")
+        rend_label.setStyleSheet("font-weight: 600; font-size: 14px;")
+        theme_lay.addWidget(rend_label)
+
+        rend_desc = QLabel(
+            "Use your GPU to render 3D meshes in the URDF Viewer. "
+            "Faster, but may cause issues on systems with missing graphics drivers."
+        )
+        rend_desc.setStyleSheet("font-size: 12px; color: palette(mid);")
+        rend_desc.setWordWrap(True)
+        theme_lay.addWidget(rend_desc)
+
+        chk_lay = QHBoxLayout()
+        self._chk_opengl = QCheckBox(" Enable Hardware OpenGL Rendering")
+        self._chk_opengl.stateChanged.connect(
+            lambda state: self.opengl_setting_changed.emit(bool(state))
+        )
+        
+        try:
+            import qtawesome as qta
+            info_icon = QLabel()
+            info_icon.setPixmap(qta.icon("fa5s.microchip", color=ThemeManager.palette()["accent"]).pixmap(16, 16))
+            chk_lay.addWidget(info_icon)
+        except Exception:
+            pass
+            
+        chk_lay.addWidget(self._chk_opengl)
+        chk_lay.addStretch()
+        theme_lay.addLayout(chk_lay)
+
         root.addWidget(theme_card)
         root.addSpacing(28)
 
