@@ -475,6 +475,9 @@ QRadioButton::indicator:checked {{
 }}
 
 /* ── Slider ──────────────────────────────────────────────────────────── */
+QSlider::horizontal {{
+    min-height: 24px;
+}}
 QSlider::groove:horizontal {{
     background: {bg_input};
     height: 4px;
