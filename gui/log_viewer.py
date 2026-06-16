@@ -118,8 +118,8 @@ class UnifiedLogViewerPage(QWidget):
         hdr.addWidget(title)
         hdr.addStretch()
 
-        btn_refresh = QPushButton(" Refresh Files")
-        btn_refresh.setIcon(ThemeManager.icon("fa5s.sync-alt", "accent"))
+        btn_refresh = QPushButton("  Refresh Files")
+        btn_refresh.setIcon(ThemeManager.icon("fa5s.sync-alt", "#ffffff"))
         btn_refresh.setProperty("class", "action-button")
         btn_refresh.clicked.connect(self.refresh_log_files)
         hdr.addWidget(btn_refresh)

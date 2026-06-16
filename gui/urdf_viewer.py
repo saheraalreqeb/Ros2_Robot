@@ -1364,6 +1364,20 @@ class URDFViewerPage(QWidget):
             f"color: {p['text_secondary']}; font-size: 12px;"
         )
         tb.addWidget(self.lbl_active)
+        
+        self.btn_ide = QPushButton()
+        self.btn_ide.setToolTip("Open URDF/Xacro file in IDE")
+        self.btn_ide.setFixedSize(24, 24)
+        self.btn_ide.setCursor(Qt.PointingHandCursor)
+        self.btn_ide.setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background: rgba(128, 128, 128, 0.2); border-radius: 4px; }")
+        try:
+            self.btn_ide.setIcon(ThemeManager.icon("fa5s.external-link-alt", "accent"))
+        except Exception:
+            self.btn_ide.setText("↗")
+        self.btn_ide.clicked.connect(self._open_active_in_ide)
+        self.btn_ide.hide()
+        tb.addWidget(self.btn_ide)
+        tb.addSpacing(16)
 
         for text, cls, slot in [
             ("Reset Camera", "action-button", self._reset_camera),
@@ -1541,6 +1555,7 @@ class URDFViewerPage(QWidget):
                 self.list_urdf_files.addItem(it)
         if self.list_urdf_files.count() == 0:
             self.lbl_active.setText("No URDF/Xacro files found")
+            self.btn_ide.hide()
             self.tree_urdf_hierarchy.clear()
             self.scene_urdf.clear()
             self.viewport3d.clear()
@@ -1551,6 +1566,7 @@ class URDFViewerPage(QWidget):
         fp = cur.data(Qt.UserRole)
         self.active_file = fp
         self.lbl_active.setText(os.path.basename(fp))
+        self.btn_ide.show()
 
         raw = ""
         try:
@@ -1570,6 +1586,12 @@ class URDFViewerPage(QWidget):
             except Exception:
                 pass
         self._parse_and_build(xml_text)
+
+    def _open_active_in_ide(self):
+        if self.active_file:
+            main_win = self.window()
+            if hasattr(main_win, "_open_in_ide"):
+                main_win._open_in_ide(self.active_file)
 
     # ── parsing ─────────────────────────────────────────────────────────────
 

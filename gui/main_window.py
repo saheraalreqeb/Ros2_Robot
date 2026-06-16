@@ -688,6 +688,12 @@ class MainWindow(QMainWindow):
             if hasattr(self, "settings_page"):
                 self.settings_page.set_opengl_enabled(use_opengl)
             self._apply_opengl_setting(use_opengl)
+
+            # 5. Default IDE
+            default_ide = settings.get("default_ide", "")
+            if hasattr(self, "settings_page"):
+                self.settings_page.set_default_ide(default_ide)
+
         except Exception:
             pass
         finally:
@@ -707,6 +713,7 @@ class MainWindow(QMainWindow):
             settings["tab_visibility"] = self.settings_page.tab_visibility()
             settings["tab_order"] = self.settings_page.tab_order()
             settings["use_opengl"] = self.settings_page.is_opengl_enabled()
+            settings["default_ide"] = self.settings_page.get_default_ide()
             
         try:
             with open(self._get_settings_path(), "w", encoding="utf-8") as f:
@@ -727,6 +734,56 @@ class MainWindow(QMainWindow):
             self.discovery_daemon.stop()
             self.discovery_daemon.wait(2000)
         self._save_settings()
+
+    def _open_in_ide(self, target_path: str):
+        """
+        Launches the target_path in the user's default IDE.
+        Prompts for an IDE if one is not set.
+        """
+        import os
+        from core.ide_launcher import get_available_ides, launch_in_ide
+        from PySide6.QtWidgets import QInputDialog
+        from PySide6.QtGui import QIcon
+
+        if not os.path.exists(target_path) and not target_path.startswith('/'):
+            # Allow pure linux paths if we are in WSL
+            self.statusBar().showMessage(f"Warning: Path may not exist locally: {target_path}", 4000)
+
+        ide_cmd = self.settings_page.get_default_ide() if hasattr(self, "settings_page") else ""
+
+        if not ide_cmd:
+            ides = get_available_ides()
+            if not ides:
+                self.statusBar().showMessage("No supported IDEs found (VSCode, PyCharm, Cursor, CLion, etc.)", 4000)
+                return
+
+            items = [ide["name"] for ide in ides]
+            
+            dialog = QInputDialog(self)
+            dialog.setWindowTitle("Select IDE")
+            dialog.setLabelText("Choose the default IDE to open files with:\n(You can change this later in Settings)")
+            dialog.setComboBoxItems(items)
+            dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
+            dialog.setStyleSheet(self.styleSheet())
+            
+            if dialog.exec() == QInputDialog.Accepted:
+                item = dialog.textValue()
+                # Find the cmd for the selected name
+                selected_ide = next((ide for ide in ides if ide["name"] == item), None)
+                if selected_ide:
+                    ide_cmd = selected_ide["cmd"]
+                    if hasattr(self, "settings_page"):
+                        self.settings_page.set_default_ide(ide_cmd)
+                        self._save_settings()
+            else:
+                return
+
+        if ide_cmd:
+            success = launch_in_ide(ide_cmd, target_path)
+            if success:
+                self.statusBar().showMessage(f"Opened {os.path.basename(target_path)} in IDE", 3000)
+            else:
+                self.statusBar().showMessage(f"Failed to open in IDE ({ide_cmd})", 4000)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -1304,6 +1361,21 @@ class MainWindow(QMainWindow):
                     f"QPushButton {{ border: none; background: transparent; }}"
                     f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
                 )
+                
+        # Update Workspace Note styling
+        if hasattr(self, "_workspace_note_card"):
+            p = ThemeManager.palette()
+            self._workspace_note_card.setStyleSheet(
+                f"QFrame {{ "
+                f"  background-color: {p['bg_hover']}; "
+                f"  border: 1px solid {p['info']}; "
+                f"  border-radius: 6px; "
+                f"}}"
+            )
+            self._workspace_note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
+            self._workspace_note_icon.setPixmap(
+                __import__("qtawesome").icon("fa5s.info-circle", color=p["info"]).pixmap(18, 18)
+            )
             
         self._save_settings()
 
@@ -1488,6 +1560,19 @@ class MainWindow(QMainWindow):
         path_title.setStyleSheet("font-weight: 600; font-size: 13px;")
         row1.addWidget(path_title)
         row1.addStretch()
+        
+        btn_ide = QPushButton("Open Workspace in IDE")
+        btn_ide.setProperty("class", "primary-btn")
+        btn_ide.setStyleSheet("padding: 6px 12px; font-weight: 600;")
+        btn_ide.setToolTip("Open the current workspace root directory in your configured IDE.")
+        btn_ide.clicked.connect(lambda: self._open_in_ide(self.current_workspace_path))
+        
+        try:
+            btn_ide.setIcon(ThemeManager.icon("fa5s.code", "normal"))
+        except Exception:
+            pass
+            
+        row1.addWidget(btn_ide)
         ws_lay.addLayout(row1)
 
         self.lbl_workspace_path = QLabel(f"{self.current_workspace_path}")
@@ -1523,25 +1608,29 @@ class MainWindow(QMainWindow):
         note_card = QFrame()
         note_card.setProperty("class", "card")
         p = ThemeManager.palette()
-        note_card.setStyleSheet(
+        self._workspace_note_card = note_card
+        self._workspace_note_card.setStyleSheet(
             f"QFrame {{ "
             f"  background-color: {p['bg_hover']}; "
             f"  border: 1px solid {p['info']}; "
             f"  border-radius: 6px; "
             f"}}"
         )
-        note_lay = QHBoxLayout(note_card)
+        note_lay = QHBoxLayout(self._workspace_note_card)
         note_lay.setContentsMargins(12, 10, 12, 10)
         note_lay.setSpacing(10)
-        note_lay.addWidget(_icon_label("fa5s.info-circle", "info"), 0, Qt.AlignVCenter)
-        note_text = QLabel(
+        
+        self._workspace_note_icon = _icon_label("fa5s.info-circle", "info")
+        note_lay.addWidget(self._workspace_note_icon, 0, Qt.AlignVCenter)
+        
+        self._workspace_note_text = QLabel(
             "Note: Workspace directories must follow the official ROS 2 folder structure "
             "(with packages stored under a 'src/' subfolder) in order for features to function properly."
         )
-        note_text.setWordWrap(True)
-        note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
-        note_lay.addWidget(note_text, 1)
-        layout.addWidget(note_card)
+        self._workspace_note_text.setWordWrap(True)
+        self._workspace_note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
+        note_lay.addWidget(self._workspace_note_text, 1)
+        layout.addWidget(self._workspace_note_card)
 
         layout.addSpacing(28)
 
@@ -1819,6 +1908,20 @@ class MainWindow(QMainWindow):
         lbl_node = QLabel(node_name)
         lbl_node.setStyleSheet("font-size: 15px; font-weight: bold;")
         row.addWidget(lbl_node)
+        row.addStretch()
+        
+        btn_ide = QPushButton()
+        btn_ide.setToolTip("Open source file (or package directory) in IDE")
+        btn_ide.setFixedSize(24, 24)
+        btn_ide.setCursor(Qt.PointingHandCursor)
+        btn_ide.setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background: rgba(128, 128, 128, 0.2); border-radius: 4px; }")
+        try:
+            btn_ide.setIcon(ThemeManager.icon("fa5s.external-link-alt", "accent"))
+        except Exception:
+            btn_ide.setText("↗")
+        btn_ide.clicked.connect(lambda _, p=pkg_name, n=node_name: self._open_node_in_ide(p, n))
+        row.addWidget(btn_ide)
+        
         lay.addLayout(row)
 
         lbl_pkg = QLabel(f"pkg: {pkg_name}")
@@ -1852,17 +1955,11 @@ class MainWindow(QMainWindow):
 
         btn_run = QPushButton()
         if is_running:
-            btn_run.setText("  Stop")
-            btn_run.setIcon(ThemeManager.icon("fa5s.stop-circle", "danger"))
-            btn_run.setStyleSheet(
-                f"background-color: {ThemeManager.palette()['danger']}; color: white;"
-            )
+            btn_run.setText("Stop")
+            btn_run.setProperty("class", "btn-danger")
         else:
-            btn_run.setText("  Run")
-            btn_run.setIcon(ThemeManager.icon("fa5s.play-circle", "success"))
-            btn_run.setStyleSheet(
-                f"background-color: {ThemeManager.palette()['success']}; color: white;"
-            )
+            btn_run.setText("Run")
+            btn_run.setProperty("class", "btn-success")
 
         btn_run.setIconSize(
             __import__("PySide6.QtCore", fromlist=["QSize"]).QSize(14, 14)
@@ -1873,6 +1970,40 @@ class MainWindow(QMainWindow):
         )
         lay.addWidget(btn_run, 0, Qt.AlignRight)
         return card
+
+    def _open_node_in_ide(self, pkg_name: str, node_name: str):
+        import os
+        from pathlib import Path
+        
+        # Determine package source root
+        ws_src = os.path.join(self.current_workspace_path, "src")
+        pkg_path = ""
+        # Brute force search for package directory within src
+        for root, dirs, files in os.walk(ws_src):
+            if "package.xml" in files:
+                if os.path.basename(root) == pkg_name:
+                    pkg_path = root
+                    break
+        
+        if not pkg_path:
+            # Fallback to workspace root if package not found in src
+            self._open_in_ide(self.current_workspace_path)
+            return
+
+        # Try to find the exact node file (node_name.py or node_name.cpp)
+        found_file = ""
+        for ext in [".py", ".cpp"]:
+            for path in Path(pkg_path).rglob(f"{node_name}{ext}"):
+                found_file = str(path)
+                break
+            if found_file:
+                break
+                
+        if found_file:
+            self._open_in_ide(found_file)
+        else:
+            # Fallback: open package directory
+            self._open_in_ide(pkg_path)
 
     def _is_node_running(self, pkg_name, node_name):
         target_path = f"install/{pkg_name}/lib/{pkg_name}/{node_name}"
@@ -1924,11 +2055,11 @@ class MainWindow(QMainWindow):
             self._kill_node(pkg_name, node_name)
             if proc_key in self.running_processes:
                 del self.running_processes[proc_key]
-            btn.setText("  Run")
-            btn.setIcon(ThemeManager.icon("fa5s.play-circle", "success"))
-            btn.setStyleSheet(
-                f"background-color: {ThemeManager.palette()['success']}; color: white;"
-            )
+            btn.setText("Run")
+            btn.setProperty("class", "btn-success")
+            btn.setStyleSheet("")  # Clear any explicit styles if present
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
         else:
             setup_bash = os.path.join(
                 self.current_workspace_path, "install", "setup.bash"
@@ -1959,11 +2090,11 @@ class MainWindow(QMainWindow):
                 errors="replace",
             )
             self.running_processes[proc_key] = proc
-            btn.setText("  Stop")
-            btn.setIcon(ThemeManager.icon("fa5s.stop-circle", "danger"))
-            btn.setStyleSheet(
-                f"background-color: {ThemeManager.palette()['danger']}; color: white;"
-            )
+            btn.setText("Stop")
+            btn.setProperty("class", "btn-danger")
+            btn.setStyleSheet("")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
 
             # Start process output reader thread
             reader = ProcessLogReader(f"Node: {pkg_name}/{node_name}", proc, self)

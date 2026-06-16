@@ -63,6 +63,7 @@ class SettingsPage(QWidget):
         self._active_list: QListWidget | None = None
         self._inactive_list: QListWidget | None = None
         self._chk_opengl: QCheckBox | None = None
+        self._default_ide_cmd: str = ""
         
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
@@ -136,14 +137,24 @@ class SettingsPage(QWidget):
         self.tab_order_changed.emit()
 
     def is_opengl_enabled(self) -> bool:
-        return self._chk_opengl.isChecked() if self._chk_opengl else False
+        if self._chk_opengl:
+            return self._chk_opengl.isChecked()
+        return False
 
-    def set_opengl_enabled(self, enabled: bool) -> None:
+    def set_opengl_enabled(self, val: bool) -> None:
         if self._chk_opengl:
             self._chk_opengl.blockSignals(True)
-            self._chk_opengl.setChecked(enabled)
+            self._chk_opengl.setChecked(val)
             self._chk_opengl.blockSignals(False)
-            self.opengl_setting_changed.emit(enabled)
+
+    def get_default_ide(self) -> str:
+        return self._default_ide_cmd
+
+    def set_default_ide(self, ide_cmd: str) -> None:
+        self._default_ide_cmd = ide_cmd
+        if hasattr(self, "_lbl_current_ide"):
+            name = ide_cmd if ide_cmd else "Not set (will prompt on next use)"
+            self._lbl_current_ide.setText(name)
 
     # ── build UI ──────────────────────────────────────────────────────────────
 
@@ -181,9 +192,7 @@ class SettingsPage(QWidget):
         hdr.addStretch()
         root.addLayout(hdr)
 
-        sub = QLabel("Personalise your Ros2 Robot experience.")
-        sub.setStyleSheet("color: palette(mid); font-size: 13px; margin-bottom: 28px;")
-        root.addWidget(sub)
+
         root.addSpacing(28)
 
         # ── Section 1 – Theme ──────────────────────────────────────────────
@@ -254,8 +263,51 @@ class SettingsPage(QWidget):
         root.addWidget(theme_card)
         root.addSpacing(28)
 
+        # ── Section 1.5 – IDE Preferences ───────────────────────────────────
+        root.addWidget(_section_label("IDE Preferences"))
+        root.addSpacing(10)
+        ide_card = _Card()
+        ide_lay = QVBoxLayout(ide_card)
+        ide_lay.setSpacing(16)
+
+        ide_label = QLabel("Default IDE")
+        ide_label.setStyleSheet("font-weight: 600; font-size: 14px;")
+        ide_lay.addWidget(ide_label)
+
+        ide_desc = QLabel(
+            "Select which IDE to use when opening Workspaces, Nodes, and Launch files."
+        )
+        ide_desc.setStyleSheet("font-size: 12px;")
+        ide_desc.setWordWrap(True)
+        ide_lay.addWidget(ide_desc)
+
+        ide_row = QHBoxLayout()
+        ide_row.setSpacing(12)
+        
+        self._lbl_current_ide = QLabel("Not set (will prompt on next use)")
+        self._lbl_current_ide.setStyleSheet("font-style: italic; color: palette(mid);")
+        ide_row.addWidget(self._lbl_current_ide)
+        
+        ide_row.addStretch()
+        
+        btn_change_ide = QPushButton("Change IDE")
+        btn_change_ide.clicked.connect(self._prompt_change_ide)
+        ide_row.addWidget(btn_change_ide)
+        
+        btn_reset_ide = QPushButton("Reset IDE")
+        def reset_ide():
+            self.set_default_ide("")
+            self.save_requested.emit()
+        btn_reset_ide.clicked.connect(reset_ide)
+        ide_row.addWidget(btn_reset_ide)
+        
+        ide_lay.addLayout(ide_row)
+        root.addWidget(ide_card)
+        root.addSpacing(28)
+
         # Sync initial selection
         self._sync_theme_buttons()
+
 
         # ── Section 2 – Sidebar Tabs ───────────────────────────────────────
         root.addWidget(_section_label("Sidebar Tabs"))
@@ -390,6 +442,30 @@ class SettingsPage(QWidget):
         self._active_list.setStyleSheet(list_style)
         self._inactive_list.setStyleSheet(list_style)
         self._sync_theme_buttons()
+
+    def _prompt_change_ide(self):
+        from core.ide_launcher import get_available_ides
+        from PySide6.QtWidgets import QInputDialog
+        
+        ides = get_available_ides()
+        if not ides:
+            return
+            
+        items = [ide["name"] for ide in ides]
+        
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Select IDE")
+        dialog.setLabelText("Choose the default IDE to open files with:")
+        dialog.setComboBoxItems(items)
+        dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
+        dialog.setStyleSheet(self.window().styleSheet())
+        
+        if dialog.exec() == QInputDialog.Accepted:
+            item = dialog.textValue()
+            selected_ide = next((ide for ide in ides if ide["name"] == item), None)
+            if selected_ide:
+                self.set_default_ide(selected_ide["cmd"])
+                self.save_requested.emit()
 
 
 # ─── Helper widgets ───────────────────────────────────────────────────────────
