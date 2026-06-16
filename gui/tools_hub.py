@@ -169,12 +169,13 @@ class _ToolRow(QFrame):
         btn_row.addWidget(self._cmd_lbl)
 
         self._btn = QPushButton(f"  Launch {tool_info['name']}")
+        self._btn.setProperty("class", "launch-btn")
         try:
             self._btn.setIcon(qta.icon("fa5s.external-link-alt",
                                        color=ThemeManager.palette()["text"]))
         except Exception:
             pass
-        self._btn.setFixedWidth(145)
+        self._btn.setMinimumWidth(140)
         self._btn.setFixedHeight(32)
         self._btn.clicked.connect(self._on_launch)
         btn_row.addWidget(self._btn)
@@ -191,8 +192,7 @@ class _ToolRow(QFrame):
             self._status_lbl.setText("● Installed")
             self._status_lbl.setStyleSheet(
                 f"font-size: 11px; font-weight: 600; padding: 2px 8px;"
-                f"border-radius: 10px; color: {p['success']};"
-                f"background: {p['success']}18; border: 1px solid {p['success']}3f;"
+                f"color: {p['success']}; background: transparent; border: none;"
             )
             self._btn.setText(f"  Launch {self._tool['name']}")
             try:
@@ -213,8 +213,7 @@ class _ToolRow(QFrame):
             self._status_lbl.setText("● Not found")
             self._status_lbl.setStyleSheet(
                 f"font-size: 11px; font-weight: 600; padding: 2px 8px;"
-                f"border-radius: 10px; color: {p['danger']};"
-                f"background: {p['danger']}18; border: 1px solid {p['danger']}3f;"
+                f"color: {p['danger']}; background: transparent; border: none;"
             )
             self._btn.setText("  Install Required")
             try:

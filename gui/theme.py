@@ -33,6 +33,7 @@ THEMES: dict[str, dict] = {
         # borders / dividers
         "border":       "rgba(255, 255, 255, 0.08)",
         "border_accent":"#3b82f6",
+        "border_launch_btn": "rgba(255, 255, 255, 0.15)",
 
         # text
         "text_primary": "#e2e8f0",
@@ -77,6 +78,7 @@ THEMES: dict[str, dict] = {
 
         "border":       "rgba(0, 0, 0, 0.08)",
         "border_accent":"#3b82f6",
+        "border_launch_btn": "rgba(0, 0, 0, 0.15)",
 
         "text_primary": "#1e293b",
         "text_secondary":"#475569",
@@ -272,6 +274,24 @@ QLineEdit, QTextEdit, QPlainTextEdit {{
 }}
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
     border: 1px solid {accent};
+}}
+
+QPushButton {{
+    background-color: {bg_selected};
+    color: {text_primary};
+    border: 1px solid {border};
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: bold;
+}}
+QPushButton:hover {{
+    background-color: {bg_hover};
+}}
+QPushButton[class="launch-btn"] {{
+    border: 1px solid {border_launch_btn};
+}}
+QPushButton[class="launch-btn"]:hover {{
+    background-color: {bg_hover};
 }}
 
 QComboBox {{
