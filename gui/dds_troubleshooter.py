@@ -88,8 +88,8 @@ class DDSTroubleshooterPage(QWidget):
         hdr.addWidget(title)
         hdr.addStretch()
 
-        self.btn_run = QPushButton(" Run Diagnostics")
-        self.btn_run.setIcon(ThemeManager.icon("fa5s.search", "accent"))
+        self.btn_run = QPushButton("  Run Diagnostics")
+        self.btn_run.setIcon(ThemeManager.icon("fa5s.search", "#ffffff"))
         self.btn_run.setProperty("class", "action-button")
         self.btn_run.clicked.connect(self.run_diagnostics)
         hdr.addWidget(self.btn_run)
@@ -200,7 +200,7 @@ class DDSTroubleshooterPage(QWidget):
 
     def run_diagnostics(self):
         self.btn_run.setEnabled(False)
-        self.btn_run.setText(" Running...")
+        self.btn_run.setText("  Running...")
         self.rec_card.hide()
 
         # 1. Environment variables check
@@ -324,7 +324,7 @@ class DDSTroubleshooterPage(QWidget):
     def _on_multicast_finished(self, success: bool, message: str):
         p = ThemeManager.palette()
         self.btn_run.setEnabled(True)
-        self.btn_run.setText(" Run Diagnostics")
+        self.btn_run.setText("  Run Diagnostics")
 
         if success:
             self.lbl_ping_status.setText(f"✅ <b>SUCCESS</b>: {message}")

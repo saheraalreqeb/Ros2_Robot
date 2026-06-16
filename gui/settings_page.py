@@ -192,9 +192,7 @@ class SettingsPage(QWidget):
         hdr.addStretch()
         root.addLayout(hdr)
 
-        sub = QLabel("Personalise your Ros2 Robot experience.")
-        sub.setStyleSheet("color: palette(mid); font-size: 13px; margin-bottom: 28px;")
-        root.addWidget(sub)
+
         root.addSpacing(28)
 
         # ── Section 1 – Theme ──────────────────────────────────────────────

@@ -1361,6 +1361,21 @@ class MainWindow(QMainWindow):
                     f"QPushButton {{ border: none; background: transparent; }}"
                     f"QPushButton:hover {{ background-color: {p['bg_hover']}; border-radius: 12px; }}"
                 )
+                
+        # Update Workspace Note styling
+        if hasattr(self, "_workspace_note_card"):
+            p = ThemeManager.palette()
+            self._workspace_note_card.setStyleSheet(
+                f"QFrame {{ "
+                f"  background-color: {p['bg_hover']}; "
+                f"  border: 1px solid {p['info']}; "
+                f"  border-radius: 6px; "
+                f"}}"
+            )
+            self._workspace_note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
+            self._workspace_note_icon.setPixmap(
+                __import__("qtawesome").icon("fa5s.info-circle", color=p["info"]).pixmap(18, 18)
+            )
             
         self._save_settings()
 
@@ -1593,25 +1608,29 @@ class MainWindow(QMainWindow):
         note_card = QFrame()
         note_card.setProperty("class", "card")
         p = ThemeManager.palette()
-        note_card.setStyleSheet(
+        self._workspace_note_card = note_card
+        self._workspace_note_card.setStyleSheet(
             f"QFrame {{ "
             f"  background-color: {p['bg_hover']}; "
             f"  border: 1px solid {p['info']}; "
             f"  border-radius: 6px; "
             f"}}"
         )
-        note_lay = QHBoxLayout(note_card)
+        note_lay = QHBoxLayout(self._workspace_note_card)
         note_lay.setContentsMargins(12, 10, 12, 10)
         note_lay.setSpacing(10)
-        note_lay.addWidget(_icon_label("fa5s.info-circle", "info"), 0, Qt.AlignVCenter)
-        note_text = QLabel(
+        
+        self._workspace_note_icon = _icon_label("fa5s.info-circle", "info")
+        note_lay.addWidget(self._workspace_note_icon, 0, Qt.AlignVCenter)
+        
+        self._workspace_note_text = QLabel(
             "Note: Workspace directories must follow the official ROS 2 folder structure "
             "(with packages stored under a 'src/' subfolder) in order for features to function properly."
         )
-        note_text.setWordWrap(True)
-        note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
-        note_lay.addWidget(note_text, 1)
-        layout.addWidget(note_card)
+        self._workspace_note_text.setWordWrap(True)
+        self._workspace_note_text.setStyleSheet(f"color: {p['text_primary']}; font-size: 12px; border: none;")
+        note_lay.addWidget(self._workspace_note_text, 1)
+        layout.addWidget(self._workspace_note_card)
 
         layout.addSpacing(28)
 
