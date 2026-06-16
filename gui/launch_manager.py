@@ -232,12 +232,37 @@ class LaunchManagerPage(QWidget):
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(4)
 
-        # File name, word-wrap so long names never get clipped
+        # Top row: Name and IDE button
+        row_top = QHBoxLayout()
+        row_top.setSpacing(4)
+        
         lbl_name = QLabel(info["filename"])
         lbl_name.setStyleSheet("font-size: 14px; font-weight: bold;")
         lbl_name.setWordWrap(True)
         lbl_name.setToolTip(info["filename"])
-        lay.addWidget(lbl_name)
+        row_top.addWidget(lbl_name)
+        row_top.addStretch()
+        
+        btn_ide = QPushButton()
+        btn_ide.setToolTip("Open launch file in IDE")
+        btn_ide.setFixedSize(24, 24)
+        btn_ide.setCursor(Qt.PointingHandCursor)
+        btn_ide.setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background: rgba(128, 128, 128, 0.2); border-radius: 4px; }")
+        try:
+            from gui.theme import ThemeManager
+            btn_ide.setIcon(ThemeManager.icon("fa5s.external-link-alt", "accent"))
+        except Exception:
+            btn_ide.setText("↗")
+            
+        def open_file():
+            main_win = self.window()
+            if hasattr(main_win, "_open_in_ide"):
+                main_win._open_in_ide(info["filepath"])
+                
+        btn_ide.clicked.connect(open_file)
+        row_top.addWidget(btn_ide)
+        
+        lay.addLayout(row_top)
 
         # Package
         lbl_pkg = QLabel(f"Package: {info['package']}")

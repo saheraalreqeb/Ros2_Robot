@@ -194,7 +194,8 @@ class _ToolRow(QFrame):
                 f"font-size: 11px; font-weight: 600; padding: 2px 8px;"
                 f"color: {p['success']}; background: transparent; border: none;"
             )
-            self._btn.setText(f"  Launch {self._tool['name']}")
+            self._btn.setProperty("class", "primary-btn")
+            self._btn.setText(f"Launch {self._tool['name']}")
             try:
                 self._btn.setIcon(qta.icon("fa5s.external-link-alt", color=p["text"]))
             except Exception:
@@ -215,7 +216,8 @@ class _ToolRow(QFrame):
                 f"font-size: 11px; font-weight: 600; padding: 2px 8px;"
                 f"color: {p['danger']}; background: transparent; border: none;"
             )
-            self._btn.setText("  Install Required")
+            self._btn.setProperty("class", "danger-btn")
+            self._btn.setText("Install Required")
             try:
                 self._btn.setIcon(qta.icon("fa5s.download", color=p["text"]))
             except Exception:
