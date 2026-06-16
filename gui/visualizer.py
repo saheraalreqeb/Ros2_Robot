@@ -107,6 +107,7 @@ class VisualizerPage(QWidget):
         accent_color = QColor(p["accent"])
         success_color = QColor(p["success"])
         node_text_color = QColor("#ffffff")
+        line_color = QColor(p["text_primary"])
 
         scale_factor = 72.0
         
@@ -152,7 +153,7 @@ class VisualizerPage(QWidget):
                     y1 = (graph_height - float(pts_list[i*2+1])) * scale_factor
                     x2 = float(pts_list[(i+1)*2]) * scale_factor
                     y2 = (graph_height - float(pts_list[(i+1)*2+1])) * scale_factor
-                    self.scene.addLine(x1, y1, x2, y2, QPen(border_color, 1.5))
+                    self.scene.addLine(x1, y1, x2, y2, QPen(line_color, 1.5))
                     
     def refresh_theme(self):
         if self.last_plain_output:
