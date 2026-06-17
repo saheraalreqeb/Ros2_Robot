@@ -1,5 +1,10 @@
 # Ros2 Robot
 
+<p align="center">
+  <img src="assets/images/banner.png" alt="ROS2 Robot Banner" width="100%">
+</p>
+
+
 *ROS is used for robots, but isn't it time to have its own robot?*  
 
 **Ros2 Robot** is a simple, modern GUI designed to manage your ROS 2 projects. Think of it as **GitHub Desktop, but for ROS 2**. 
@@ -11,21 +16,37 @@ It eliminates those repetitive, soul-crushing terminal commands so you can actua
 ## Screenshots
 
 <p align="center">
-  <table>
+  <img src="assets/images/system_screenshots/1_Workspace_Dark.png" width="100%">
+</p>
+
+<details>
+<summary><b>📸 Click to expand gallery (9 more screenshots)</b></summary>
+
+<p align="center">
+  <table width="100%">
     <tr>
-      <td><img src="assets/images/system_screenshots/1_Workspace_Dark.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/2_Nodes_Dark.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/3_Launch_Manager_Dark.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/4_Visualizer_Dark.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/5_URDF_Viewer_Dark.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/6_URDF_Viewer_Light.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/7_Logs_Viewer_Light.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/8_Tools_Hub_Light.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/9_Settings_1_Light.png" width="800"></td>
-      <td><img src="assets/images/system_screenshots/10_Settings_2_Light.png" width="800"></td>
+      <td width="50%"><img src="assets/images/system_screenshots/2_Nodes_Dark.png"></td>
+      <td width="50%"><img src="assets/images/system_screenshots/3_Launch_Manager_Dark.png"></td>
+    </tr>
+    <tr>
+      <td><img src="assets/images/system_screenshots/4_Visualizer_Dark.png"></td>
+      <td><img src="assets/images/system_screenshots/5_URDF_Viewer_Dark.png"></td>
+    </tr>
+    <tr>
+      <td><img src="assets/images/system_screenshots/6_URDF_Viewer_Light.png"></td>
+      <td><img src="assets/images/system_screenshots/7_Logs_Viewer_Light.png"></td>
+    </tr>
+    <tr>
+      <td><img src="assets/images/system_screenshots/8_Tools_Hub_Light.png"></td>
+      <td><img src="assets/images/system_screenshots/9_Settings_1_Light.png"></td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center"><img src="assets/images/system_screenshots/10_Settings_2_Light.png" width="50%"></td>
     </tr>
   </table>
 </p>
+
+</details>
 
 ---
 

@@ -26,7 +26,7 @@ class LogTailerThread(QThread):
         self._stop_requested = True
 
     def run(self):
-        if not os.path.exists(self.filepath):
+        if not self.filepath or not os.path.exists(self.filepath):
             self.new_line.emit(f"❌ Log file not found: {self.filepath}")
             return
 
@@ -328,6 +328,9 @@ class UnifiedLogViewerPage(QWidget):
             return
 
         data = current.data(Qt.UserRole)
+        if data is None:
+            return  # Ignore clicks on header items
+            
         self.clear_logs()
 
         if data == "LIVE":
