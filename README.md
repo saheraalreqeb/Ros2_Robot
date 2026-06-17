@@ -16,28 +16,37 @@ It eliminates those repetitive, soul-crushing terminal commands so you can actua
 ## Screenshots
 
 <p align="center">
+  <img src="assets/images/system_screenshots/1_Workspace_Dark.png" width="100%">
+</p>
+
+<details>
+<summary><b>📸 Click to expand gallery (9 more screenshots)</b></summary>
+
+<p align="center">
   <table width="100%">
     <tr>
-      <td width="50%"><img src="assets/images/system_screenshots/1_Workspace_Dark.png"></td>
       <td width="50%"><img src="assets/images/system_screenshots/2_Nodes_Dark.png"></td>
+      <td width="50%"><img src="assets/images/system_screenshots/3_Launch_Manager_Dark.png"></td>
     </tr>
     <tr>
-      <td><img src="assets/images/system_screenshots/3_Launch_Manager_Dark.png"></td>
       <td><img src="assets/images/system_screenshots/4_Visualizer_Dark.png"></td>
-    </tr>
-    <tr>
       <td><img src="assets/images/system_screenshots/5_URDF_Viewer_Dark.png"></td>
+    </tr>
+    <tr>
       <td><img src="assets/images/system_screenshots/6_URDF_Viewer_Light.png"></td>
-    </tr>
-    <tr>
       <td><img src="assets/images/system_screenshots/7_Logs_Viewer_Light.png"></td>
-      <td><img src="assets/images/system_screenshots/8_Tools_Hub_Light.png"></td>
     </tr>
     <tr>
+      <td><img src="assets/images/system_screenshots/8_Tools_Hub_Light.png"></td>
       <td><img src="assets/images/system_screenshots/9_Settings_1_Light.png"></td>
-      <td><img src="assets/images/system_screenshots/10_Settings_2_Light.png"></td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center"><img src="assets/images/system_screenshots/10_Settings_2_Light.png" width="50%"></td>
     </tr>
   </table>
+</p>
+
+</details>
 
 ---
 
