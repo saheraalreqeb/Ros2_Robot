@@ -144,17 +144,17 @@ class TitleBar(QFrame):
         self.min_btn = QPushButton("—")
         self.min_btn.setProperty("class", "mac-btn")
         self.min_btn.setObjectName("macMin")
-        self.min_btn.clicked.connect(self.parent.showMinimized)
+        self.min_btn.pressed.connect(self.parent.showMinimized)
         
         self.max_btn = QPushButton("＋")
         self.max_btn.setProperty("class", "mac-btn")
         self.max_btn.setObjectName("macMax")
-        self.max_btn.clicked.connect(self._toggle_maximize)
+        self.max_btn.pressed.connect(self._toggle_maximize)
         
         self.close_btn = QPushButton("✕")
         self.close_btn.setProperty("class", "mac-btn")
         self.close_btn.setObjectName("macClose")
-        self.close_btn.clicked.connect(self.parent.close)
+        self.close_btn.pressed.connect(self.parent.close)
 
         mac_lay.addWidget(self.min_btn)
         mac_lay.addWidget(self.max_btn)
@@ -165,10 +165,21 @@ class TitleBar(QFrame):
         self._start_pos = None
 
     def _toggle_maximize(self):
-        if self.parent.isMaximized():
-            self.parent.showNormal()
+        from PySide6.QtCore import QRect
+        
+        if not hasattr(self.parent, "_is_custom_maximized"):
+            self.parent._is_custom_maximized = False
+            self.parent._normal_geometry = self.parent.geometry()
+            
+        if self.parent._is_custom_maximized:
+            self.parent.setGeometry(self.parent._normal_geometry)
+            self.parent._is_custom_maximized = False
         else:
-            self.parent.showMaximized()
+            self.parent._normal_geometry = self.parent.geometry()
+            screen = self.parent.screen()
+            target_rect = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
+            self.parent.setGeometry(target_rect)
+            self.parent._is_custom_maximized = True
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
@@ -176,6 +187,19 @@ class TitleBar(QFrame):
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._start_pos is not None:
+            # If dragged while maximized, snap back to normal size
+            if getattr(self.parent, "_is_custom_maximized", False):
+                self.parent._is_custom_maximized = False
+                cursor_pos = event.globalPosition().toPoint()
+                norm_geom = getattr(self.parent, "_normal_geometry", None)
+                if norm_geom:
+                    # Keep the window centered on the mouse horizontally
+                    new_x = cursor_pos.x() - (norm_geom.width() // 2)
+                    new_y = cursor_pos.y() - self._start_pos.y()
+                    self.parent.setGeometry(new_x, new_y, norm_geom.width(), norm_geom.height())
+                self._start_pos = event.globalPosition().toPoint()
+                return
+
             delta = event.globalPosition().toPoint() - self._start_pos
             self.parent.move(self.parent.pos() + delta)
             self._start_pos = event.globalPosition().toPoint()
@@ -575,6 +599,17 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
         self.resize(1180, 780)
         self.setMinimumSize(900, 600)
+        
+        # Center window on the screen where the cursor currently is
+        from PySide6.QtGui import QCursor
+        from PySide6.QtWidgets import QApplication
+        screen = QApplication.screenAt(QCursor.pos())
+        if screen:
+            screen_geom = screen.availableGeometry()
+            self.move(
+                screen_geom.left() + (screen_geom.width() - 1180) // 2,
+                screen_geom.top() + (screen_geom.height() - 780) // 2
+            )
 
         self.cli = ROS2CLI()
         if os.name == "nt":
