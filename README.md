@@ -216,15 +216,7 @@ Or source your profile manually:
 source ~/.bashrc
 ```
 
-### GUI works with `python3 main.py` but not `ros2_robot`
 
-Make sure the launcher is executable and the symlink is correct:
-
-```bash
-bash install.sh
-```
-
----
 
 ## Development
 
@@ -234,12 +226,14 @@ The app is installed in **editable mode**, so any changes you make to the source
 Ros2_Robot/
 ├── main.py                  # Entry point
 ├── install.sh               # One-command installer
+├── uninstall.sh             # Uninstaller script
 ├── ros2_robot_bin           # Shell launcher (symlinked to ~/.local/bin/ros2_robot)
 ├── requirements.txt
 ├── core/
 │   ├── ros2_cli.py          # ROS 2 CLI wrapper (WSL-aware)
 │   ├── workspace.py         # Workspace discovery
-│   └── code_generator.py   # Package/node boilerplate generator
+│   ├── ide_launcher.py      # IDE integration launcher
+│   └── code_generator.py    # Package/node boilerplate generator
 └── gui/
     ├── main_window.py       # Main window + sidebar navigation
     ├── theme.py             # Dark/Light theme system (ThemeManager)
@@ -252,7 +246,11 @@ Ros2_Robot/
     ├── parameter_manager.py # Node parameter editor
     ├── bag_manager.py       # Bag record & playback
     ├── urdf_viewer.py       # 3D URDF/Xacro viewer with joint controls
-    └── visualizer.py        # Network graph
+    ├── visualizer.py        # Network graph
+    ├── dds_troubleshooter.py# DDS Troubleshooter
+    ├── log_viewer.py        # Log Viewer
+    ├── flow_layout.py       # Custom FlowLayout
+    └── help_docs.json       # In-app help documentation
 ```
 
 ## Author & Contact
@@ -260,6 +258,7 @@ Ros2_Robot/
 **Saher ALREQEB**
 - **Email**: [s.a.alreqeb@gmail.com](mailto:s.a.alreqeb@gmail.com)
 - **Website**: [saheralreqeb.work](https://www.saheralreqeb.work/)
+- **LinkedIn**: [www.linkedin.com/in/saheraalreqeb](https://www.linkedin.com/in/saheraalreqeb)
 
 ---
 
