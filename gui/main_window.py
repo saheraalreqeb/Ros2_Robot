@@ -1628,6 +1628,7 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(btn_open)
 
         btn_init = _action_btn("Initialize New Workspace", "fa5s.plus-circle")
+        btn_init.setProperty("class", "btn-success")
         btn_init.setToolTip(
             "<b>Initialize Workspace</b><br>"
             "Creates a new colcon workspace with a <code>src/</code> directory."
@@ -2360,6 +2361,24 @@ class MainWindow(QMainWindow):
             self, "Open Workspace", self.current_workspace_path
         )
         if dir_path:
+            src_path = os.path.join(dir_path, "src")
+            if not os.path.exists(src_path):
+                reply = QMessageBox.question(
+                    self, "Initialize Workspace?",
+                    "The selected folder does not appear to be a ROS 2 workspace (it lacks a 'src' directory).\n\n"
+                    "Would you like to initialize it as a workspace now by creating a 'src' folder?",
+                    QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                    QMessageBox.Yes
+                )
+                if reply == QMessageBox.Yes:
+                    try:
+                        os.makedirs(src_path, exist_ok=True)
+                    except Exception as e:
+                        QMessageBox.warning(self, "Error", f"Failed to create src directory:\n{e}")
+                        return
+                elif reply == QMessageBox.Cancel:
+                    return
+            
             self.current_workspace_path = dir_path
 
     def _mock_init_workspace(self):
