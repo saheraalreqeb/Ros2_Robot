@@ -540,7 +540,8 @@ class BagManagerPage(QWidget):
     # ------------------------------------------------------------------
     def _browse_bag(self):
         path = QFileDialog.getExistingDirectory(
-            self, "Select Bag Directory", self.workspace_path
+            self, "Select Bag Directory", self.workspace_path,
+            options=QFileDialog.DontUseNativeDialog
         )
         if path:
             self.txt_play_path.setText(path)

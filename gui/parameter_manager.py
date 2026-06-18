@@ -427,6 +427,7 @@ class ParameterManagerPage(QWidget):
             "Save Parameter Dump",
             default_name,
             "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if not filepath:
             return  # user cancelled
@@ -467,6 +468,7 @@ class ParameterManagerPage(QWidget):
             "Load Parameter File",
             "",
             "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if not filepath:
             return

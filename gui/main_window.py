@@ -596,13 +596,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._current_workspace_path_val = os.getcwd()
         self.setWindowTitle("Ros2 Robot")
+        from PySide6.QtWidgets import QApplication
         self.setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
+        QApplication.instance().setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
         self.resize(1180, 780)
         self.setMinimumSize(900, 600)
         
         # Center window on the screen where the cursor currently is
         from PySide6.QtGui import QCursor
-        from PySide6.QtWidgets import QApplication
         screen = QApplication.screenAt(QCursor.pos())
         if screen:
             screen_geom = screen.availableGeometry()
@@ -635,7 +636,6 @@ class MainWindow(QMainWindow):
         self.node_monitor_timer.start()
 
         # Apply default dark theme (replaces styles.qss)
-        from PySide6.QtWidgets import QApplication
         ThemeManager.apply(QApplication.instance(), "dark")
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
@@ -799,7 +799,6 @@ class MainWindow(QMainWindow):
             dialog.setLabelText("Choose the default IDE to open files with:\n(You can change this later in Settings)")
             dialog.setComboBoxItems(items)
             dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
-            dialog.setStyleSheet(self.styleSheet())
             
             if dialog.exec() == QInputDialog.Accepted:
                 item = dialog.textValue()
@@ -1375,6 +1374,7 @@ class MainWindow(QMainWindow):
         self.update()
 
         self.setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
+        QApplication.instance().setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
         self._refresh_nav_icons()
 
         # Refresh page theme properties dynamically
@@ -2358,7 +2358,8 @@ class MainWindow(QMainWindow):
 
     def _open_workspace(self):
         dir_path = QFileDialog.getExistingDirectory(
-            self, "Open Workspace", self.current_workspace_path
+            self, "Open Workspace", self.current_workspace_path,
+            options=QFileDialog.DontUseNativeDialog
         )
         if dir_path:
             src_path = os.path.join(dir_path, "src")
