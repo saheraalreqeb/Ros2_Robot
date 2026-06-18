@@ -2,12 +2,14 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QComboBox, QPushButton, QFormLayout
 )
+from PySide6.QtCore import Qt
 
 class CreatePackageDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Create ROS2 Package")
         self.resize(400, 200)
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
         layout = QVBoxLayout(self)
 
@@ -54,6 +56,7 @@ class CreateNodeDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Add ROS2 Node")
         self.resize(400, 150)
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
         layout = QVBoxLayout(self)
 

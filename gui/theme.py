@@ -108,15 +108,15 @@ _QSS_TEMPLATE = """
 /* ── Reset ──────────────────────────────────────────────────────────── */
 * {{ outline: 0; }}
 
-QMainWindow, QDialog {{
-    background-color: {bg_main};
-}}
-
 QWidget {{
     color: {text_primary};
     font-family: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
     font-size: 14px;
     background-color: transparent;
+}}
+
+QMainWindow, QDialog, QFileDialog, QInputDialog, QMessageBox {{
+    background-color: {bg_main};
 }}
 
 QLabel a {{
