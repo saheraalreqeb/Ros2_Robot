@@ -141,6 +141,8 @@ class LaunchManagerPage(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet("#launch_scroll { background: transparent; }")
+        self.launch_scroll_area = scroll
+        self.launch_scroll_area.verticalScrollBar().valueChanged.connect(self._on_launch_scroll)
 
         self._cards_container = QWidget()
         self._cards_container.setObjectName("launch_cards_container")
@@ -164,14 +166,12 @@ class LaunchManagerPage(QWidget):
 
     def _refresh_launch_files(self) -> None:
         """Walk workspace src/ for .launch.py and .launch.xml files."""
-        # Clear existing cards
-        while self._cards_layout.count():
-            item = self._cards_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
-
         ws = ROS2Workspace(self.workspace_path)
         if not ws.is_valid() and "pytest" not in sys.modules:
+            while self._cards_layout.count():
+                item = self._cards_layout.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
             lbl = QLabel(
                 f"No valid workspace found at:\n{self.workspace_path}\n\n"
                 "Please open or initialise a workspace first."
@@ -182,6 +182,18 @@ class LaunchManagerPage(QWidget):
             return
 
         launch_files = self._find_launch_files(ws.src_path) if ws.is_valid() else []
+
+        if getattr(self, "_all_launch_data", None) == launch_files and not getattr(self, "_launch_dirty", False):
+            return
+
+        self._all_launch_data = launch_files
+        self._launch_dirty = False
+        self._displayed_launch_count = 0
+
+        while self._cards_layout.count():
+            item = self._cards_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
 
         self.launch_file_list.clear()
         for info in launch_files:
@@ -198,9 +210,29 @@ class LaunchManagerPage(QWidget):
             self._cards_layout.addWidget(lbl)
             return
 
-        for info in launch_files:
+        self._load_more_launch_files()
+
+    def _load_more_launch_files(self) -> None:
+        PAGE_SIZE = 50
+        if not hasattr(self, "_all_launch_data") or self._displayed_launch_count >= len(self._all_launch_data):
+            return
+
+        start = self._displayed_launch_count
+        end = min(start + PAGE_SIZE, len(self._all_launch_data))
+        
+        for i in range(start, end):
+            info = self._all_launch_data[i]
             card = self._make_launch_card(info)
             self._cards_layout.addWidget(card)
+            
+        self._displayed_launch_count = end
+
+    def _on_launch_scroll(self, value: int) -> None:
+        if not hasattr(self, "launch_scroll_area"):
+            return
+        scroll_bar = self.launch_scroll_area.verticalScrollBar()
+        if value >= scroll_bar.maximum() * 0.8:
+            self._load_more_launch_files()
 
     @staticmethod
     def _find_launch_files(src_path: str) -> List[Dict[str, str]]:
