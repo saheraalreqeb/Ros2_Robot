@@ -7,6 +7,8 @@ class FlowLayout(QLayout):
         self._item_list = []
         self.m_hSpace = hSpacing
         self.m_vSpace = vSpacing
+        self._cached_width = -1
+        self._cached_height = -1
         self.setContentsMargins(margin, margin, margin, margin)
 
     def __del__(self):
@@ -16,6 +18,7 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):
         self._item_list.append(item)
+        self.invalidate()
 
     def horizontalSpacing(self):
         if self.m_hSpace >= 0:
@@ -39,8 +42,14 @@ class FlowLayout(QLayout):
 
     def takeAt(self, index):
         if 0 <= index < len(self._item_list):
+            self.invalidate()
             return self._item_list.pop(index)
         return None
+
+    def invalidate(self):
+        super().invalidate()
+        self._cached_width = -1
+        self._cached_height = -1
 
     def expandingDirections(self):
         return Qt.Orientations(0)
@@ -49,7 +58,11 @@ class FlowLayout(QLayout):
         return True
 
     def heightForWidth(self, width):
+        if width == self._cached_width and self._cached_height != -1:
+            return self._cached_height
         height = self._doLayout(QRect(0, 0, width, 0), True)
+        self._cached_width = width
+        self._cached_height = height
         return height
 
     def setGeometry(self, rect):
