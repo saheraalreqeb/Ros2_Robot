@@ -292,7 +292,11 @@
     "title": "Lifecycle Manager",
     "icon": "fa5s.sync-alt",
     "description": "Manages ROS 2 lifecycle nodes. Lifecycle nodes are stateful nodes that transition through states like Unconfigured, Inactive, Active, and Finalized. Use this tool to view and change the state of lifecycle-managed nodes.",
-    "documentation_link": "https://docs.ros.org/en/humble/Tutorials/Intermediate/Lifecycle/Managed-Nodes.html",
+    "documentation_link": [
+      "https://docs.ros.org/en/jazzy/Tutorials/Demos/Managed-Nodes.html",
+      "https://design.ros2.org/articles/node_lifecycle.html",
+      "https://foxglove.dev/blog/how-to-use-ros2-lifecycle-nodes"
+    ],
     "under_the_hood": [
       {
         "command": "ros2 lifecycle nodes",

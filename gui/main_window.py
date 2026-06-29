@@ -588,20 +588,22 @@ class HelpDialog(QDialog):
                 
                 scroll_lay.addLayout(tip_lay)
                 
-        # Documentation Link
+        # Documentation Link(s)
         doc_link = page_data.get("documentation_link", "")
         if doc_link:
             link_title = QLabel("Learn More")
             link_title.setStyleSheet("font-size: 13px; font-weight: bold; color: palette(highlight); margin-top: 10px;")
             scroll_lay.addWidget(link_title)
-            
-            link_lbl = QLabel(
-                f"To learn more, check: <a href=\"{doc_link}\" style=\"color: {p['accent']}; text-decoration: underline;\">ROS 2 Documentation</a>"
-            )
-            link_lbl.setOpenExternalLinks(True)
-            link_lbl.setWordWrap(True)
-            link_lbl.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
-            scroll_lay.addWidget(link_lbl)
+
+            links = doc_link if isinstance(doc_link, list) else [doc_link]
+            for link_url in links:
+                link_lbl = QLabel(
+                    f"<a href=\"{link_url}\" style=\"color: {p['accent']}; text-decoration: underline;\">{link_url}</a>"
+                )
+                link_lbl.setOpenExternalLinks(True)
+                link_lbl.setWordWrap(True)
+                link_lbl.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
+                scroll_lay.addWidget(link_lbl)
 
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll, 1)
