@@ -74,6 +74,7 @@ from gui.visualizer import VisualizerPage
 from gui.dds_troubleshooter import DDSTroubleshooterPage
 from gui.log_viewer import UnifiedLogViewerPage
 from gui.urdf_viewer import URDFViewerPage
+from gui.lifecycle_manager import LifecycleManagerPage
 
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
@@ -406,7 +407,8 @@ _NAV_ENTRIES = [
     (6, "btn_actions",        "Action Inspector (Beta)",               "fa5s.bullseye",       "_refresh_actions"),
     (8, "btn_troubleshooter", "DDS Troubleshooter (Beta)",             "fa5s.network-wired",  None),
     (9, "btn_params",         "Parameters",                            "fa5s.sliders-h",      "_refresh_params"),
-    (14, "btn_settings",      "Settings",                              "fa5s.cog",            None),
+    (14, "btn_lifecycle",    "Lifecycle Manager (Beta)",              "fa5s.sync-alt",       "_refresh_lifecycle"),
+    (15, "btn_settings",      "Settings",                              "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -425,6 +427,7 @@ _TAB_KEY_FOR_BTN = {
     "btn_bags":           "bags",
     "btn_urdf":           "urdf",
     "btn_tools":          "tools",
+    "btn_lifecycle":     "lifecycle",
     "btn_settings":       "settings",
 }
 
@@ -909,7 +912,7 @@ class MainWindow(QMainWindow):
         sb_lay.addLayout(self.nav_layout)
 
         for page_id, attr, label, icon_name, _ in _NAV_ENTRIES:
-            btn = self._create_nav_button(page_id, label, icon_name)
+            btn = self._create_nav_button(page_id, label, icon_name, attr)
             setattr(self, attr, btn)
             self._nav_buttons[attr] = btn
             if attr == "btn_topics":
@@ -938,13 +941,15 @@ class MainWindow(QMainWindow):
         self.btn_workspace.setChecked(True)
 
     def _create_nav_button(self, page_id: int, label: str,
-                           icon_name: str) -> QPushButton:
+                           icon_name: str, object_name: str = "") -> QPushButton:
         btn = QPushButton(f"  {label}")
         btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         btn.setProperty("class", "nav-button")
         btn.setCheckable(True)
         btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(16, 16))
         btn.setIcon(ThemeManager.icon(icon_name))
+        if object_name:
+            btn.setObjectName(object_name)
         self.nav_group.addButton(btn, page_id)
         return btn
 
@@ -985,9 +990,10 @@ class MainWindow(QMainWindow):
         self._bag_manager_page = None
         self._urdf_page = None
         self._tools_hub_page = None
-        self.settings_page = self._create_settings_page()   # 14
+        self._lifecycle_manager_page = None
+        self.settings_page = self._create_settings_page()   # 15
 
-        for i in range(14):
+        for i in range(15):
             placeholder = QWidget()
             placeholder.setProperty("is_placeholder", True)
             self.content_stack.addWidget(placeholder)
@@ -1051,6 +1057,9 @@ class MainWindow(QMainWindow):
             elif page_id == 13:
                 page = ToolsHubPage(self.cli)
                 self._tools_hub_page = page
+            elif page_id == 14:
+                page = LifecycleManagerPage(self.cli)
+                self._lifecycle_manager_page = page
             else:
                 return
 
@@ -1061,7 +1070,7 @@ class MainWindow(QMainWindow):
                 page.refresh_theme()
 
             # Attach help button next to page title or on its own transparent line
-            if page_id != 14:
+            if page_id != 15:
                 self._attach_help_button_to_page(page_id, page)
 
             is_current = (self.content_stack.currentIndex() == page_id)
@@ -1213,6 +1222,17 @@ class MainWindow(QMainWindow):
     def tools_hub_page(self, val):
         self._tools_hub_page = val
 
+    @property
+    def lifecycle_manager_page(self):
+        if getattr(self, "_lifecycle_manager_page", None) is not None:
+            return self._lifecycle_manager_page
+        self._instantiate_page(14)
+        return getattr(self, "_lifecycle_manager_page", None)
+
+    @lifecycle_manager_page.setter
+    def lifecycle_manager_page(self, val):
+        self._lifecycle_manager_page = val
+
     # ── Page switching ────────────────────────────────────────────────────────
 
     def _switch_page(self, page_id: int):
@@ -1232,6 +1252,7 @@ class MainWindow(QMainWindow):
             11: "bag_manager_page",
             12: "urdf_page",
             13: "tools_hub_page",
+            14: "lifecycle_manager_page",
         }
         if page_id in prop_map:
             getattr(self, prop_map[page_id])
@@ -1282,6 +1303,7 @@ class MainWindow(QMainWindow):
             11: self._refresh_bags,
             12: self._refresh_urdf,
             13: self._refresh_tools,
+            14: self._refresh_lifecycle,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
@@ -1396,6 +1418,9 @@ class MainWindow(QMainWindow):
     def _refresh_tools(self):
         if hasattr(self.tools_hub_page, "_refresh_status"):
             self.tools_hub_page._refresh_status()
+
+    def _refresh_lifecycle(self):
+        self._lifecycle_manager_page.refresh_lifecycle_nodes()
 
     def _refresh_topics(self):
         if hasattr(self.topic_inspector_page, "_refresh_topics"):
@@ -2608,6 +2633,7 @@ class MainWindow(QMainWindow):
             11: "bag_manager_page",
             12: "urdf_page",
             13: "tools_hub_page",
+            14: "lifecycle_manager_page",
         }
         from PySide6.QtCore import QCoreApplication
         for page_id, attr, _, _, _ in _NAV_ENTRIES:
