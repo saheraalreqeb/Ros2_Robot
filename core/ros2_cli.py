@@ -6,11 +6,11 @@ logger = logging.getLogger(__name__)
 
 class ROS2CLI:
     """Wrapper for ROS2 command line interface."""
-    
+
     def __init__(self, use_wsl: bool = False):
         """
         Initialize the ROS2CLI wrapper.
-        
+
         Args:
             use_wsl (bool): Whether to prefix commands with 'wsl' for execution on Windows. Default False because we run natively inside WSL.
         """
@@ -20,19 +20,20 @@ class ROS2CLI:
     def set_workspace(self, path: str):
         self.workspace_path = path
 
-    def _run_command(self, cmd: List[str], cwd: Optional[str] = None) -> str:
+    def _run_command(self, cmd: List[str], cwd: Optional[str] = None, timeout: Optional[float] = None) -> str:
         """
         Run a command and return its output as a string.
-        
+
         Args:
             cmd (List[str]): The command and its arguments.
             cwd (Optional[str]): Working directory to execute the command in.
-            
+            timeout (Optional[float]): Seconds before the command is killed. None means no timeout.
+
         Returns:
             str: Standard output of the command.
-            
+
         Raises:
-            RuntimeError: If the command execution fails.
+            RuntimeError: If the command execution fails or times out.
         """
         import os
         import re
@@ -82,9 +83,13 @@ class ROS2CLI:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                check=True
+                check=True,
+                timeout=timeout
             )
             return result.stdout.strip()
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Command timed out after {timeout}s: {' '.join(final_cmd)}")
+            raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}") from e
         except subprocess.CalledProcessError as e:
             logger.error(f"Command failed: {e.cmd}")
             logger.error(f"Stdout: {e.stdout}")
@@ -95,21 +100,21 @@ class ROS2CLI:
             raise RuntimeError(f"Command not found: {final_cmd[0]}. Ensure WSL/ROS2 is installed.") from e
 
     def pkg_create(
-        self, 
-        package_name: str, 
-        build_type: str = 'ament_python', 
-        dependencies: Optional[List[str]] = None, 
+        self,
+        package_name: str,
+        build_type: str = 'ament_python',
+        dependencies: Optional[List[str]] = None,
         cwd: Optional[str] = None
     ) -> str:
         """
         Create a new ROS2 package.
-        
+
         Args:
             package_name (str): The name of the new package.
             build_type (str): Build system to use ('ament_python' or 'ament_cmake').
             dependencies (Optional[List[str]]): List of ROS2 package dependencies.
             cwd (Optional[str]): Directory to create the package in (typically workspace 'src').
-            
+
         Returns:
             str: The output of the command.
         """
@@ -121,7 +126,7 @@ class ROS2CLI:
     def node_list(self) -> List[str]:
         """
         List running ROS2 nodes.
-        
+
         Returns:
             List[str]: List of running node names.
         """
@@ -136,7 +141,7 @@ class ROS2CLI:
     def topic_list(self) -> List[str]:
         """
         List active ROS2 topics.
-        
+
         Returns:
             List[str]: List of active topic names.
         """
@@ -158,7 +163,7 @@ class ROS2CLI:
             'topics': set(),
             'edges': []
         }
-        
+
         if not nodes:
             return topology
 
@@ -179,22 +184,22 @@ class ROS2CLI:
         for node, output in results:
             if not output:
                 continue
-                
+
             current_section = None
             for line in output.split('\n'):
                 line = line.rstrip()
                 if not line:
                     continue
-                    
+
                 if not line.startswith(' '):
                     # Node name or other top-level output
                     continue
-                    
+
                 if line.startswith('  ') and not line.startswith('    '):
                     # Section header
                     current_section = line.strip().rstrip(':')
                     continue
-                    
+
                 if line.startswith('    '):
                     # Item in the section
                     item = line.strip()
@@ -203,7 +208,7 @@ class ROS2CLI:
                         topic_name = item.split(':')[0].strip()
                     else:
                         topic_name = item
-                        
+
                     if current_section == 'Publishers':
                         topology['topics'].add(topic_name)
                         topology['edges'].append({
@@ -218,14 +223,14 @@ class ROS2CLI:
                             'dst': node,
                             'label': 'subscribe'
                         })
-                        
+
         topology['topics'] = list(topology['topics'])
         return topology
 
     def service_list(self) -> List[str]:
         """
         List active ROS2 services.
-        
+
         Returns:
             List[str]: List of active service names.
         """
@@ -239,7 +244,7 @@ class ROS2CLI:
     def action_list(self) -> List[str]:
         """
         List active ROS2 actions.
-        
+
         Returns:
             List[str]: List of active action names.
         """
@@ -253,10 +258,10 @@ class ROS2CLI:
     def action_info(self, name: str) -> str:
         """
         Get info for a ROS2 action.
-        
+
         Args:
             name (str): Action name.
-            
+
         Returns:
             str: Raw action info output.
         """
@@ -265,3 +270,73 @@ class ROS2CLI:
             return self._run_command(cmd)
         except RuntimeError as exc:
             return str(exc)
+
+    def lifecycle_nodes(self) -> List[str]:
+        """
+        List lifecycle-managed nodes.
+
+        Returns:
+            List[str]: List of lifecycle node names. Returns empty list on failure.
+
+        Notes:
+            Uses a 5-second timeout to avoid hanging on DDS/lifecycle issues.
+        """
+        cmd = ['ros2', 'lifecycle', 'nodes']
+        try:
+            output = self._run_command(cmd, timeout=5)
+            return [line.strip() for line in output.split('\n') if line.strip()]
+        except RuntimeError:
+            return []
+
+    def lifecycle_get_state(self, node_name: str) -> str:
+        """
+        Get the lifecycle state of a node.
+
+        Args:
+            node_name (str): The name of the lifecycle node.
+
+        Returns:
+            str: The current lifecycle state (e.g., 'active', 'inactive').
+
+        Raises:
+            RuntimeError: If the command fails or times out after 5 seconds.
+        """
+        cmd = ['ros2', 'lifecycle', 'get', node_name]
+        return self._run_command(cmd, timeout=5)
+
+    def lifecycle_list_transitions(self, node_name: str) -> List[str]:
+        """
+        List available lifecycle transitions for a node.
+
+        Args:
+            node_name (str): The name of the lifecycle node.
+
+        Returns:
+            List[str]: List of available transition names. Returns empty list on failure.
+
+        Notes:
+            Uses a 5-second timeout to avoid hanging on DDS/lifecycle issues.
+        """
+        cmd = ['ros2', 'lifecycle', 'list', node_name]
+        try:
+            output = self._run_command(cmd, timeout=5)
+            return [line.strip() for line in output.split('\n') if line.strip()]
+        except RuntimeError:
+            return []
+
+    def lifecycle_set_transition(self, node_name: str, transition: str) -> str:
+        """
+        Trigger a lifecycle transition on a node.
+
+        Args:
+            node_name (str): The name of the lifecycle node.
+            transition (str): The transition to trigger (e.g., 'configure', 'activate').
+
+        Returns:
+            str: Output from the command.
+
+        Raises:
+            RuntimeError: If the command fails or times out after 10 seconds.
+        """
+        cmd = ['ros2', 'lifecycle', 'set', node_name, transition]
+        return self._run_command(cmd, timeout=10)
