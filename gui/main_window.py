@@ -74,6 +74,7 @@ from gui.visualizer import VisualizerPage
 from gui.dds_troubleshooter import DDSTroubleshooterPage
 from gui.log_viewer import UnifiedLogViewerPage
 from gui.urdf_viewer import URDFViewerPage
+from gui.lifecycle_manager import LifecycleManagerPage
 
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
@@ -106,6 +107,47 @@ class DiscoveryDaemon(QThread):
 
     def stop(self):
         self.running = False
+
+
+class ResourceMonitorWorker(QThread):
+    resources_updated = Signal(dict)
+
+    def run(self):
+        import psutil
+        import re
+        running = {}
+        for proc in psutil.process_iter(["cmdline"]):
+            try:
+                cmdline = proc.info.get("cmdline")
+                if not cmdline:
+                    continue
+                cmd_str = " ".join(cmdline)
+                if any(x in cmd_str for x in ("pgrep", "nano", "vim")):
+                    continue
+                
+                m = re.search(r'ros2\s+run\s+([^\s]+)\s+([^\s]+)', cmd_str)
+                if m:
+                    pkg, node = m.groups()
+                    running[(pkg, node)] = proc
+                    continue
+                
+                m = re.search(r'install/([^\s]+)/lib/\1/([^\s]+)', cmd_str)
+                if m:
+                    pkg, node = m.groups()
+                    running[(pkg, node)] = proc
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+                
+        metrics = {}
+        for (pkg, node), proc in running.items():
+            try:
+                cpu = proc.cpu_percent(interval=None)
+                mem_rss = proc.memory_info().rss / (1024 * 1024)
+                threads = proc.num_threads()
+                metrics[(pkg, node)] = {"cpu": cpu, "mem": mem_rss, "threads": threads}
+            except:
+                pass
+        self.resources_updated.emit(metrics)
 
 
 class TitleBar(QFrame):
@@ -365,7 +407,8 @@ _NAV_ENTRIES = [
     (6, "btn_actions",        "Action Inspector (Beta)",               "fa5s.bullseye",       "_refresh_actions"),
     (8, "btn_troubleshooter", "DDS Troubleshooter (Beta)",             "fa5s.network-wired",  None),
     (9, "btn_params",         "Parameters",                            "fa5s.sliders-h",      "_refresh_params"),
-    (14, "btn_settings",      "Settings",                              "fa5s.cog",            None),
+    (14, "btn_lifecycle",    "Lifecycle Manager (Beta)",              "fa5s.sync-alt",       "_refresh_lifecycle"),
+    (15, "btn_settings",      "Settings",                              "fa5s.cog",            None),
 ]
 
 # Keys that map to SettingsPage._TAB_DEFS keys
@@ -384,6 +427,7 @@ _TAB_KEY_FOR_BTN = {
     "btn_bags":           "bags",
     "btn_urdf":           "urdf",
     "btn_tools":          "tools",
+    "btn_lifecycle":     "lifecycle",
     "btn_settings":       "settings",
 }
 
@@ -544,20 +588,22 @@ class HelpDialog(QDialog):
                 
                 scroll_lay.addLayout(tip_lay)
                 
-        # Documentation Link
+        # Documentation Link(s)
         doc_link = page_data.get("documentation_link", "")
         if doc_link:
             link_title = QLabel("Learn More")
             link_title.setStyleSheet("font-size: 13px; font-weight: bold; color: palette(highlight); margin-top: 10px;")
             scroll_lay.addWidget(link_title)
-            
-            link_lbl = QLabel(
-                f"To learn more, check: <a href=\"{doc_link}\" style=\"color: {p['accent']}; text-decoration: underline;\">ROS 2 Documentation</a>"
-            )
-            link_lbl.setOpenExternalLinks(True)
-            link_lbl.setWordWrap(True)
-            link_lbl.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
-            scroll_lay.addWidget(link_lbl)
+
+            links = doc_link if isinstance(doc_link, list) else [doc_link]
+            for link_url in links:
+                link_lbl = QLabel(
+                    f"<a href=\"{link_url}\" style=\"color: {p['accent']}; text-decoration: underline;\">{link_url}</a>"
+                )
+                link_lbl.setOpenExternalLinks(True)
+                link_lbl.setWordWrap(True)
+                link_lbl.setStyleSheet(f"color: {p['text_secondary']}; font-size: 13px;")
+                scroll_lay.addWidget(link_lbl)
 
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll, 1)
@@ -868,7 +914,7 @@ class MainWindow(QMainWindow):
         sb_lay.addLayout(self.nav_layout)
 
         for page_id, attr, label, icon_name, _ in _NAV_ENTRIES:
-            btn = self._create_nav_button(page_id, label, icon_name)
+            btn = self._create_nav_button(page_id, label, icon_name, attr)
             setattr(self, attr, btn)
             self._nav_buttons[attr] = btn
             if attr == "btn_topics":
@@ -897,13 +943,15 @@ class MainWindow(QMainWindow):
         self.btn_workspace.setChecked(True)
 
     def _create_nav_button(self, page_id: int, label: str,
-                           icon_name: str) -> QPushButton:
+                           icon_name: str, object_name: str = "") -> QPushButton:
         btn = QPushButton(f"  {label}")
         btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         btn.setProperty("class", "nav-button")
         btn.setCheckable(True)
         btn.setIconSize(__import__("PySide6.QtCore", fromlist=["QSize"]).QSize(16, 16))
         btn.setIcon(ThemeManager.icon(icon_name))
+        if object_name:
+            btn.setObjectName(object_name)
         self.nav_group.addButton(btn, page_id)
         return btn
 
@@ -944,9 +992,10 @@ class MainWindow(QMainWindow):
         self._bag_manager_page = None
         self._urdf_page = None
         self._tools_hub_page = None
-        self.settings_page = self._create_settings_page()   # 14
+        self._lifecycle_manager_page = None
+        self.settings_page = self._create_settings_page()   # 15
 
-        for i in range(14):
+        for i in range(15):
             placeholder = QWidget()
             placeholder.setProperty("is_placeholder", True)
             self.content_stack.addWidget(placeholder)
@@ -1010,6 +1059,9 @@ class MainWindow(QMainWindow):
             elif page_id == 13:
                 page = ToolsHubPage(self.cli)
                 self._tools_hub_page = page
+            elif page_id == 14:
+                page = LifecycleManagerPage(self.cli)
+                self._lifecycle_manager_page = page
             else:
                 return
 
@@ -1020,7 +1072,7 @@ class MainWindow(QMainWindow):
                 page.refresh_theme()
 
             # Attach help button next to page title or on its own transparent line
-            if page_id != 14:
+            if page_id != 15:
                 self._attach_help_button_to_page(page_id, page)
 
             is_current = (self.content_stack.currentIndex() == page_id)
@@ -1172,6 +1224,17 @@ class MainWindow(QMainWindow):
     def tools_hub_page(self, val):
         self._tools_hub_page = val
 
+    @property
+    def lifecycle_manager_page(self):
+        if getattr(self, "_lifecycle_manager_page", None) is not None:
+            return self._lifecycle_manager_page
+        self._instantiate_page(14)
+        return getattr(self, "_lifecycle_manager_page", None)
+
+    @lifecycle_manager_page.setter
+    def lifecycle_manager_page(self, val):
+        self._lifecycle_manager_page = val
+
     # ── Page switching ────────────────────────────────────────────────────────
 
     def _switch_page(self, page_id: int):
@@ -1191,6 +1254,7 @@ class MainWindow(QMainWindow):
             11: "bag_manager_page",
             12: "urdf_page",
             13: "tools_hub_page",
+            14: "lifecycle_manager_page",
         }
         if page_id in prop_map:
             getattr(self, prop_map[page_id])
@@ -1241,6 +1305,7 @@ class MainWindow(QMainWindow):
             11: self._refresh_bags,
             12: self._refresh_urdf,
             13: self._refresh_tools,
+            14: self._refresh_lifecycle,
         }
         if page_id in refresh_map:
             refresh_map[page_id]()
@@ -1252,24 +1317,50 @@ class MainWindow(QMainWindow):
 
     def _refresh_packages(self):
         """Reload the package cards from the current workspace."""
-        # Clear existing cards
+        workspace = ROS2Workspace(self.current_workspace_path)
+        packages = workspace.get_packages()
+
+        if getattr(self, "_all_packages_data", None) == packages and not getattr(self, "_packages_dirty", False):
+            return
+
+        self._all_packages_data = packages
+        self._packages_dirty = False
+        self._displayed_packages_count = 0
+
         while self._pkg_flow.count():
             item = self._pkg_flow.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        workspace = ROS2Workspace(self.current_workspace_path)
-        packages = workspace.get_packages()
-
-        if not packages:
+        if not self._all_packages_data:
             lbl = QLabel(f"No packages found in:\n{self.current_workspace_path}")
             lbl.setStyleSheet("font-style: italic; font-size: 13px;")
             self._pkg_flow.addWidget(lbl)
             return
 
-        for pkg in packages:
+        self._load_more_packages()
+
+    def _load_more_packages(self):
+        PAGE_SIZE = 50
+        if not hasattr(self, "_all_packages_data") or self._displayed_packages_count >= len(self._all_packages_data):
+            return
+
+        start = self._displayed_packages_count
+        end = min(start + PAGE_SIZE, len(self._all_packages_data))
+        
+        for i in range(start, end):
+            pkg = self._all_packages_data[i]
             card = self._make_package_card(pkg)
             self._pkg_flow.addWidget(card)
+            
+        self._displayed_packages_count = end
+
+    def _on_packages_scroll(self, value):
+        if not hasattr(self, "packages_scroll_area"):
+            return
+        scroll_bar = self.packages_scroll_area.verticalScrollBar()
+        if value >= scroll_bar.maximum() * 0.8:
+            self._load_more_packages()
 
     def _make_package_card(self, pkg: dict) -> QFrame:
         card = QFrame()
@@ -1329,6 +1420,9 @@ class MainWindow(QMainWindow):
     def _refresh_tools(self):
         if hasattr(self.tools_hub_page, "_refresh_status"):
             self.tools_hub_page._refresh_status()
+
+    def _refresh_lifecycle(self):
+        self._lifecycle_manager_page.refresh_lifecycle_nodes()
 
     def _refresh_topics(self):
         if hasattr(self.topic_inspector_page, "_refresh_topics"):
@@ -1800,16 +1894,17 @@ class MainWindow(QMainWindow):
         outer_lay.addSpacing(18)
 
         # ── Package cards (flow layout inside scroll area) ──────────────────
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
+        self.packages_scroll_area = QScrollArea()
+        self.packages_scroll_area.setWidgetResizable(True)
+        self.packages_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.packages_scroll_area.verticalScrollBar().valueChanged.connect(self._on_packages_scroll)
 
         pkg_container = QWidget()
         self._pkg_flow = FlowLayout(
             pkg_container, margin=0, hSpacing=20, vSpacing=20
         )
-        scroll.setWidget(pkg_container)
-        outer_lay.addWidget(scroll, 1)
+        self.packages_scroll_area.setWidget(pkg_container)
+        outer_lay.addWidget(self.packages_scroll_area, 1)
 
         return outer
 
@@ -1866,16 +1961,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(card)
         layout.addSpacing(18)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
+        self.nodes_scroll_area = QScrollArea()
+        self.nodes_scroll_area.setWidgetResizable(True)
+        self.nodes_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.nodes_scroll_area.verticalScrollBar().valueChanged.connect(self._on_nodes_scroll)
 
         self.nodes_container = QWidget()
         self.nodes_flow_layout = FlowLayout(
             self.nodes_container, margin=0, hSpacing=20, vSpacing=20
         )
-        scroll_area.setWidget(self.nodes_container)
-        layout.addWidget(scroll_area, 1)
+        self.nodes_scroll_area.setWidget(self.nodes_container)
+        layout.addWidget(self.nodes_scroll_area, 1)
 
         return page
 
@@ -1883,29 +1979,93 @@ class MainWindow(QMainWindow):
     #  Node logic
     # ═══════════════════════════════════════════════════════════════════════════
 
+    def _scan_running_processes(self):
+        running = {}
+        try:
+            import psutil
+            import re
+            for proc in psutil.process_iter(["cmdline"]):
+                try:
+                    cmdline = proc.info.get("cmdline")
+                    if not cmdline:
+                        continue
+                    cmd_str = " ".join(cmdline)
+                    if any(x in cmd_str for x in ("pgrep", "nano", "vim")):
+                        continue
+                    
+                    # Match 'ros2 run pkg node'
+                    m = re.search(r'ros2\s+run\s+([^\s]+)\s+([^\s]+)', cmd_str)
+                    if m:
+                        pkg, node = m.groups()
+                        running[(pkg, node)] = proc
+                        continue
+                    
+                    # Match 'install/pkg/lib/pkg/node'
+                    m = re.search(r'install/([^\s]+)/lib/\1/([^\s]+)', cmd_str)
+                    if m:
+                        pkg, node = m.groups()
+                        running[(pkg, node)] = proc
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+        except ImportError:
+            pass
+        return running
+
     def _refresh_nodes_list(self):
+        workspace = ROS2Workspace(self.current_workspace_path)
+        packages = workspace.get_packages()
+
+        new_nodes_data = []
+        for pkg in packages:
+            pkg_name = pkg["name"]
+            for node_name in pkg.get("nodes", []):
+                new_nodes_data.append((pkg_name, node_name))
+
+        if getattr(self, "_all_nodes_data", None) == new_nodes_data and not getattr(self, "_nodes_dirty", False):
+            return
+
+        self._all_nodes_data = new_nodes_data
+        self._nodes_dirty = False
+        self._displayed_nodes_count = 0
         self.active_node_cards = []
+
         while self.nodes_flow_layout.count():
             item = self.nodes_flow_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        workspace = ROS2Workspace(self.current_workspace_path)
-        packages = workspace.get_packages()
-
-        has_nodes = False
-        for pkg in packages:
-            pkg_name = pkg["name"]
-            for node_name in pkg.get("nodes", []):
-                has_nodes = True
-                card = self._make_node_card(pkg_name, node_name)
-                self.nodes_flow_layout.addWidget(card)
-                self.active_node_cards.append(card)
-
-        if not has_nodes:
+        if not self._all_nodes_data:
             lbl = QLabel(f"No nodes found in:\n{self.current_workspace_path}")
             lbl.setStyleSheet("font-style: italic; font-size: 13px;")
             self.nodes_flow_layout.addWidget(lbl)
+            return
+
+        self._running_dict_cache = self._scan_running_processes()
+        self._load_more_nodes()
+
+    def _load_more_nodes(self):
+        PAGE_SIZE = 50
+        if not hasattr(self, "_all_nodes_data") or self._displayed_nodes_count >= len(self._all_nodes_data):
+            return
+            
+        start = self._displayed_nodes_count
+        end = min(start + PAGE_SIZE, len(self._all_nodes_data))
+        
+        if not hasattr(self, "_running_dict_cache"):
+            self._running_dict_cache = self._scan_running_processes()
+            
+        for i in range(start, end):
+            pkg_name, node_name = self._all_nodes_data[i]
+            card = self._make_node_card(pkg_name, node_name, self._running_dict_cache)
+            self.nodes_flow_layout.addWidget(card)
+            self.active_node_cards.append(card)
+            
+        self._displayed_nodes_count = end
+
+    def _on_nodes_scroll(self, value):
+        scroll_bar = self.nodes_scroll_area.verticalScrollBar()
+        if value >= scroll_bar.maximum() * 0.8:
+            self._load_more_nodes()
 
     def _kill_all_running_nodes(self):
         # Terminate GUI-managed processes
@@ -1929,7 +2089,7 @@ class MainWindow(QMainWindow):
         # Refresh state
         self._refresh_nodes_list()
 
-    def _make_node_card(self, pkg_name: str, node_name: str) -> QFrame:
+    def _make_node_card(self, pkg_name: str, node_name: str, running_dict=None) -> QFrame:
         card = QFrame()
         card.setProperty("class", "card")
         card.setFixedWidth(260)
@@ -2041,7 +2201,10 @@ class MainWindow(QMainWindow):
             # Fallback: open package directory
             self._open_in_ide(pkg_path)
 
-    def _is_node_running(self, pkg_name, node_name):
+    def _is_node_running(self, pkg_name, node_name, running_dict=None):
+        if running_dict is not None:
+            return (pkg_name, node_name) in running_dict
+            
         target_path = f"install/{pkg_name}/lib/{pkg_name}/{node_name}"
         target_cmd = f"ros2 run {pkg_name} {node_name}"
         for proc in psutil.process_iter(["cmdline"]):
@@ -2085,8 +2248,8 @@ class MainWindow(QMainWindow):
             return f"/mnt/{m.group(1).lower()}{m.group(2)}" if m else path
 
         proc_key = f"{pkg_name}:{node_name}"
-        is_running = self._is_node_running(pkg_name, node_name)
-
+        running_dict = self._scan_running_processes()
+        is_running = self._is_node_running(pkg_name, node_name, running_dict)
         if is_running:
             self._kill_node(pkg_name, node_name)
             if proc_key in self.running_processes:
@@ -2142,63 +2305,44 @@ class MainWindow(QMainWindow):
         if self.content_stack.currentIndex() != 2:
             return
 
+        if not hasattr(self, "_resource_worker"):
+            self._resource_worker = ResourceMonitorWorker(self)
+            self._resource_worker.resources_updated.connect(self._on_resources_updated)
+            
+        if not self._resource_worker.isRunning():
+            self._resource_worker.start()
+
+    def _on_resources_updated(self, metrics: dict):
+        if self.content_stack.currentIndex() != 2:
+            return
+
         for card in getattr(self, "active_node_cards", []):
             pkg = card.pkg_name
             node = card.node_name
 
-            # Check if cached process is still running and is correct
-            proc = card.process_obj
-            is_running = False
-            if proc:
-                try:
-                    if proc.is_running():
-                        cmdline = proc.cmdline()
-                        cmd_str = " ".join(cmdline) if cmdline else ""
-                        target_path = f"install/{pkg}/lib/{pkg}/{node}"
-                        target_cmd = f"ros2 run {pkg} {node}"
-                        if (target_path in cmd_str or target_cmd in cmd_str) and not any(x in cmd_str for x in ("pgrep", "nano", "vim")):
-                            is_running = True
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
+            data = metrics.get((pkg, node))
 
-            if not is_running:
-                proc = None
-                target_path = f"install/{pkg}/lib/{pkg}/{node}"
-                target_cmd = f"ros2 run {pkg} {node}"
-                # Search system processes
-                for p_iter in psutil.process_iter(["cmdline"]):
-                    try:
-                        cmdline = p_iter.info.get("cmdline")
-                        if not cmdline:
-                            continue
-                        cmd_str = " ".join(cmdline)
-                        if (target_path in cmd_str or target_cmd in cmd_str) and not any(x in cmd_str for x in ("pgrep", "nano", "vim")):
-                            proc = p_iter
-                            break
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        continue
-                card.process_obj = proc
-
-            if proc:
-                try:
-                    # Query metrics
-                    cpu = proc.cpu_percent(interval=None)
-                    mem_rss = proc.memory_info().rss / (1024 * 1024)
-                    threads = proc.num_threads()
-
-                    card.lbl_cpu.setText(f"CPU: {cpu:.1f}%")
-                    card.lbl_mem.setText(f"Memory: {mem_rss:.1f} MB")
-                    card.lbl_threads.setText(f"Threads: {threads}")
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    card.lbl_cpu.setText("CPU: --")
-                    card.lbl_mem.setText("Memory: --")
-                    card.lbl_threads.setText("Threads: --")
-                    card.process_obj = None
+            if data:
+                card.lbl_cpu.setText(f"CPU: {data['cpu']:.1f}%")
+                card.lbl_mem.setText(f"Memory: {data['mem']:.1f} MB")
+                card.lbl_threads.setText(f"Threads: {data['threads']}")
+                
+                if hasattr(card, "btn_run") and card.btn_run.text() != "Stop":
+                    card.btn_run.setText("Stop")
+                    card.btn_run.setProperty("class", "btn-danger")
+                    card.btn_run.style().unpolish(card.btn_run)
+                    card.btn_run.style().polish(card.btn_run)
             else:
                 card.lbl_cpu.setText("CPU: --")
                 card.lbl_mem.setText("Memory: --")
                 card.lbl_threads.setText("Threads: --")
                 card.process_obj = None
+                
+                if hasattr(card, "btn_run") and card.btn_run.text() == "Stop":
+                    card.btn_run.setText("Run")
+                    card.btn_run.setProperty("class", "btn-primary")
+                    card.btn_run.style().unpolish(card.btn_run)
+                    card.btn_run.style().polish(card.btn_run)
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  Build logic
@@ -2491,6 +2635,7 @@ class MainWindow(QMainWindow):
             11: "bag_manager_page",
             12: "urdf_page",
             13: "tools_hub_page",
+            14: "lifecycle_manager_page",
         }
         from PySide6.QtCore import QCoreApplication
         for page_id, attr, _, _, _ in _NAV_ENTRIES:

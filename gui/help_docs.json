@@ -287,5 +287,37 @@
       "If a tool shows 'Not found', install it using apt (e.g. sudo apt install ros-<distro>-rviz2).",
       "Sourcing your workspace is sometimes required for tools like RViz2 to discover custom plugins."
     ]
+  },
+  "lifecycle": {
+    "title": "Lifecycle Manager",
+    "icon": "fa5s.sync-alt",
+    "description": "Manages ROS 2 lifecycle nodes. Lifecycle nodes are stateful nodes that transition through states like Unconfigured, Inactive, Active, and Finalized. Use this tool to view and change the state of lifecycle-managed nodes.",
+    "documentation_link": [
+      "https://docs.ros.org/en/jazzy/Tutorials/Demos/Managed-Nodes.html",
+      "https://design.ros2.org/articles/node_lifecycle.html",
+      "https://foxglove.dev/blog/how-to-use-ros2-lifecycle-nodes"
+    ],
+    "under_the_hood": [
+      {
+        "command": "ros2 lifecycle nodes",
+        "description": "Lists all nodes that support lifecycle state management."
+      },
+      {
+        "command": "ros2 lifecycle get <node>",
+        "description": "Queries the current lifecycle state of the specified node."
+      },
+      {
+        "command": "ros2 lifecycle list <node>",
+        "description": "Lists the allowed transitions from the node's current state."
+      },
+      {
+        "command": "ros2 lifecycle set <node> <transition>",
+        "description": "Triggers a lifecycle state transition on the specified node."
+      }
+    ],
+    "tips": [
+      "Lifecycle transitions are sequential: a node must go through configure → activate to become active.",
+      "If a transition fails, check that the node is in the correct state for that transition."
+    ]
   }
 }

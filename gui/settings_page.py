@@ -53,6 +53,7 @@ class SettingsPage(QWidget):
         ("services",       "Service Inspector (Beta)",              False, False),
         ("actions",        "Action Inspector (Beta)",               False, False),
         ("troubleshooter", "DDS Troubleshooter (Beta)",             False, False),
+        ("lifecycle",     "Lifecycle Manager (Beta)",             False, False),
         ("params",         "Parameters",                            False, False),
         ("settings",       "Settings",                              True,  True),
     ]
