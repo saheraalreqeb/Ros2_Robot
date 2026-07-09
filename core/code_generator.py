@@ -164,12 +164,87 @@ int main(int argc, char * argv[])
     @staticmethod
     def generate_cpp_lifecycle_node(package_dir: str, package_name: str, node_name: str) -> str:
         """
-        C++ lifecycle node generation is not yet supported.
-        Raises NotImplementedError with a clear message.
+        Generates a C++ lifecycle node using rclcpp_lifecycle::LifecycleNode.
+        Returns the path to the generated file.
         """
-        raise NotImplementedError(
-            "Lifecycle node generation is currently supported for Python only."
-        )
+        class_name = f"{node_name.capitalize()}Node"
+        content = f"""#include <memory>
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "rclcpp_lifecycle/state.hpp"
+
+using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+
+class {class_name} : public rclcpp_lifecycle::LifecycleNode
+{{
+public:
+  {class_name}() : rclcpp_lifecycle::LifecycleNode("{node_name}")
+  {{
+    RCLCPP_INFO(get_logger(), "Lifecycle node created: state = unconfigured");
+  }}
+
+protected:
+  CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_INFO(get_logger(), "on_configure() called");
+    return CallbackReturn::SUCCESS;
+  }}
+
+  CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_INFO(get_logger(), "on_activate() called");
+    return CallbackReturn::SUCCESS;
+  }}
+
+  CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_INFO(get_logger(), "on_deactivate() called");
+    return CallbackReturn::SUCCESS;
+  }}
+
+  CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_INFO(get_logger(), "on_cleanup() called");
+    return CallbackReturn::SUCCESS;
+  }}
+
+  CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_INFO(get_logger(), "on_shutdown() called");
+    return CallbackReturn::SUCCESS;
+  }}
+
+  CallbackReturn on_error(const rclcpp_lifecycle::State & state) override
+  {{
+    (void) state;
+    RCLCPP_ERROR(get_logger(), "on_error() called");
+    return CallbackReturn::SUCCESS;
+  }}
+}};
+
+int main(int argc, char * argv[])
+{{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<{class_name}>();
+  rclcpp::spin(node->get_node_base_interface());
+  rclcpp::shutdown();
+  return 0;
+}}
+"""
+        node_file_name = f"{node_name}.cpp"
+        target_dir = os.path.join(package_dir, 'src')
+        os.makedirs(target_dir, exist_ok=True)
+        target_file = os.path.join(target_dir, node_file_name)
+
+        with open(target_file, 'w') as f:
+            f.write(content)
+
+        return target_file
 
     @staticmethod
     def modify_setup_py(setup_py_path: str, package_name: str, node_name: str, module_name: str = None):
@@ -222,10 +297,12 @@ int main(int argc, char * argv[])
             f.write(new_content)
 
     @staticmethod
-    def modify_cmakelists(cmakelists_path: str, node_name: str):
+    def modify_cmakelists(cmakelists_path: str, node_name: str, lifecycle: bool = False):
         """
         Modifies an existing CMakeLists.txt to add executable, ament_target_dependencies,
-        and install directives for a new C++ node. Ensures find_package(rclcpp REQUIRED) is present.
+        and install directives for a new C++ node.
+        When lifecycle=True, also adds rclcpp_lifecycle to dependencies and ensures
+        find_package(rclcpp_lifecycle REQUIRED) is present.
         Raises an error if the insertion point cannot be found.
         """
         if not os.path.exists(cmakelists_path):
@@ -250,9 +327,26 @@ int main(int argc, char * argv[])
             else:
                 content = "find_package(rclcpp REQUIRED)\n" + content
 
+        if lifecycle:
+            # Ensure find_package(rclcpp_lifecycle REQUIRED) is present
+            if 'find_package(rclcpp_lifecycle' not in content:
+                find_rclcpp_line = 'find_package(rclcpp REQUIRED)'
+                # Find the right variant
+                for line in content.split('\n'):
+                    stripped = line.strip()
+                    if stripped.startswith('find_package(rclcpp') and 'REQUIRED' in stripped:
+                        find_rclcpp_line = line
+                        break
+                replacement = f"{find_rclcpp_line}\nfind_package(rclcpp_lifecycle REQUIRED)"
+                content = content.replace(find_rclcpp_line, replacement, 1)
+
+            deps = "rclcpp rclcpp_lifecycle"
+        else:
+            deps = "rclcpp"
+
         injection = f"""
 add_executable({node_name} src/{node_name}.cpp)
-ament_target_dependencies({node_name} rclcpp)
+ament_target_dependencies({node_name} {deps})
 
 install(TARGETS {node_name}
   DESTINATION lib/${{PROJECT_NAME}}
@@ -281,3 +375,29 @@ install(TARGETS {node_name}
             new_content = content.replace('</package>', '  <depend>rclcpp</depend>\n</package>')
             with open(package_xml_path, 'w') as f:
                 f.write(new_content)
+
+    @staticmethod
+    def modify_package_xml(package_xml_path: str, dependency: str):
+        """
+        Ensures the given <depend> element exists in package.xml.
+        Does nothing if the dependency already exists.
+        """
+        if not os.path.exists(package_xml_path):
+            raise FileNotFoundError(f"package.xml not found at {package_xml_path}")
+
+        with open(package_xml_path, 'r') as f:
+            content = f.read()
+
+        depend_tag = f"<depend>{dependency}</depend>"
+        if depend_tag in content:
+            return  # Already present
+
+        # Insert before the closing </package> tag
+        closing_tag = '</package>'
+        if closing_tag not in content:
+            raise ValueError(f"Could not find '</package>' in {package_xml_path}")
+
+        new_content = content.replace(closing_tag, f'  {depend_tag}\n{closing_tag}')
+
+        with open(package_xml_path, 'w') as f:
+            f.write(new_content)

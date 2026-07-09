@@ -221,36 +221,195 @@ def test_generate_python_node_unchanged(tmp_path):
     assert "from rclpy.node import Node" in content
     assert "class My_python_nodeNode(Node):" in content
 
-# ── C++ lifecycle node (unsupported fallback) tests ──────────────────
+# ── C++ lifecycle node tests ─────────────────────────────────────────
 
-def test_generate_cpp_lifecycle_node_exists():
-    """The method must exist on CodeGenerator."""
-    assert hasattr(CodeGenerator, "generate_cpp_lifecycle_node")
-    assert callable(CodeGenerator.generate_cpp_lifecycle_node)
-
-
-def test_generate_cpp_lifecycle_node_raises(tmp_path):
-    """C++ lifecycle node generation must raise NotImplementedError
-    with a clear Python-only message."""
-    with pytest.raises(NotImplementedError) as exc_info:
-        CodeGenerator.generate_cpp_lifecycle_node(
-            str(tmp_path), "test_pkg", "my_cpp_lc_node"
-        )
-    assert "Python only" in str(exc_info.value)
-
-
-def test_generate_cpp_lifecycle_node_does_not_create_file(tmp_path):
-    """Raising must not leave a .cpp file behind."""
+def test_generate_cpp_lifecycle_node_creates_file(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
     node_name = "my_cpp_lc_node"
-    try:
-        CodeGenerator.generate_cpp_lifecycle_node(
-            str(tmp_path), "test_pkg", node_name
-        )
-    except NotImplementedError:
-        pass
 
-    cpp_file = tmp_path / "src" / f"{node_name}.cpp"
-    assert not cpp_file.exists()
+    generated_file = CodeGenerator.generate_cpp_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    assert os.path.exists(generated_file)
+    assert generated_file.endswith("my_cpp_lc_node.cpp")
+
+
+def test_generate_cpp_lifecycle_node_includes_headers(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_cpp_lc_node"
+
+    generated_file = CodeGenerator.generate_cpp_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert '#include "rclcpp_lifecycle/lifecycle_node.hpp"' in content
+    assert '#include "rclcpp_lifecycle/state.hpp"' in content
+    assert "rclcpp_lifecycle::LifecycleNode" in content
+    assert "CallbackReturn" in content
+
+
+def test_generate_cpp_lifecycle_node_class_structure(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_cpp_lc_node"
+
+    generated_file = CodeGenerator.generate_cpp_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert f"class My_cpp_lc_nodeNode : public rclcpp_lifecycle::LifecycleNode" in content
+    assert f'My_cpp_lc_nodeNode() : rclcpp_lifecycle::LifecycleNode("my_cpp_lc_node")' in content
+    assert "int main(int argc, char * argv[])" in content
+    assert "auto node = std::make_shared<My_cpp_lc_nodeNode>();" in content
+    assert "rclcpp::spin(node->get_node_base_interface());" in content
+    assert "rclcpp::spin(std::make_shared" not in content
+
+
+def test_generate_cpp_lifecycle_node_callbacks_present(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_cpp_lc_node"
+
+    generated_file = CodeGenerator.generate_cpp_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    for callback in [
+        "on_configure",
+        "on_activate",
+        "on_deactivate",
+        "on_cleanup",
+        "on_shutdown",
+        "on_error"
+    ]:
+        assert f"{callback}(" in content, f"Missing callback: {callback}"
+
+
+def test_generate_cpp_lifecycle_node_callbacks_return_success(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_cpp_lc_node"
+
+    generated_file = CodeGenerator.generate_cpp_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert content.count("CallbackReturn::SUCCESS") == 6
+
+
+# ── CMakeLists.txt lifecycle integration tests ───────────────────────
+
+def test_modify_cmakelists_lifecycle(tmp_path):
+    cmakelists = tmp_path / "CMakeLists.txt"
+    cmakelists.write_text("""cmake_minimum_required(VERSION 3.8)
+project(test_pkg)
+
+find_package(rclcpp REQUIRED)
+
+ament_package()
+""")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "my_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        content = f.read()
+
+    assert "add_executable(my_lc_node src/my_lc_node.cpp)" in content
+    assert "ament_target_dependencies(my_lc_node rclcpp rclcpp_lifecycle)" in content
+    assert "find_package(rclcpp_lifecycle REQUIRED)" in content
+    assert "install(TARGETS my_lc_node" in content
+
+
+def test_modify_cmakelists_lifecycle_idempotent(tmp_path):
+    """Repeated calls with lifecycle=True must not duplicate anything."""
+    cmakelists = tmp_path / "CMakeLists.txt"
+    cmakelists.write_text("""cmake_minimum_required(VERSION 3.8)
+project(test_pkg)
+
+find_package(rclcpp REQUIRED)
+
+ament_package()
+""")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "my_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        first_pass = f.read()
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "my_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        second_pass = f.read()
+
+    assert first_pass == second_pass
+    # No duplication of find_package
+    assert first_pass.count("find_package(rclcpp_lifecycle REQUIRED)") == 1
+
+
+# ── package.xml lifecycle integration tests ──────────────────────────
+
+def test_modify_package_xml_adds_dependency(tmp_path):
+    package_xml = tmp_path / "package.xml"
+    package_xml.write_text("""<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>test_pkg</name>
+  <version>0.0.0</version>
+  <description>Test package</description>
+  <maintainer email="user@example.com">user</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclcpp</depend>
+</package>
+""")
+
+    CodeGenerator.modify_package_xml(str(package_xml), "rclcpp_lifecycle")
+
+    with open(package_xml, "r") as f:
+        content = f.read()
+
+    assert "<depend>rclcpp_lifecycle</depend>" in content
+
+
+def test_modify_package_xml_no_duplicate(tmp_path):
+    package_xml = tmp_path / "package.xml"
+    package_xml.write_text("""<?xml version="1.0"?>
+<package format="3">
+  <name>test_pkg</name>
+  <version>0.0.0</version>
+  <description>Test</description>
+  <maintainer email="u@e.com">u</maintainer>
+  <license>Apache-2.0</license>
+  <depend>rclcpp_lifecycle</depend>
+</package>
+""")
+
+    CodeGenerator.modify_package_xml(str(package_xml), "rclcpp_lifecycle")
+
+    with open(package_xml, "r") as f:
+        content = f.read()
+
+    assert content.count("<depend>rclcpp_lifecycle</depend>") == 1
+
+
+def test_modify_package_xml_no_file():
+    with pytest.raises(FileNotFoundError):
+        CodeGenerator.modify_package_xml("invalid/package.xml", "rclcpp_lifecycle")
 
 
 def test_generate_cpp_node_unchanged(tmp_path):
