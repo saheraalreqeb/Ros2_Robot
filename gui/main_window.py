@@ -79,19 +79,7 @@ from gui.lifecycle_manager import LifecycleManagerPage
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
 
-def _safe_stop_thread(thread, timeout_ms=3000):
-    """Safely stop a QThread with bounded wait. Idempotent."""
-    if thread is None:
-        return
-    try:
-        if thread.isRunning():
-            if hasattr(thread, 'requestInterruption'):
-                thread.requestInterruption()
-            if hasattr(thread, 'quit'):
-                thread.quit()
-            thread.wait(timeout_ms)
-    except RuntimeError:
-        pass  # Qt object may already be deleted
+from gui.thread_utils import _safe_stop_thread
 
 
 class DiscoveryDaemon(QThread):

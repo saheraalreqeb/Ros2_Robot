@@ -5,7 +5,7 @@ Since importing gui modules pulls in QtWidgets which requires libGL.so.1
 (unavailable in headless CI), we extract _safe_stop_thread from source
 via AST and test page cleanup() methods with mock page objects.
 
-All _safe_stop_thread definitions in the codebase are byte-identical.
+_safe_stop_thread lives in gui/thread_utils.py — the single shared definition.
 """
 import ast
 import textwrap
@@ -22,8 +22,8 @@ from PySide6.QtCore import QThread
 
 @pytest.fixture(scope="module")
 def safe_stop_thread():
-    """Extract the canonical _safe_stop_thread from gui/main_window.py."""
-    source = Path("gui/main_window.py").read_text(encoding="utf-8")
+    """Extract the canonical _safe_stop_thread from gui/thread_utils.py."""
+    source = Path("gui/thread_utils.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "_safe_stop_thread":
@@ -32,7 +32,7 @@ def safe_stop_thread():
             ns: dict = {}
             exec(func_source, ns)
             return ns["_safe_stop_thread"]
-    raise RuntimeError("Could not find _safe_stop_thread in gui/main_window.py")
+    raise RuntimeError("Could not find _safe_stop_thread in gui/thread_utils.py")
 
 
 # ---------------------------------------------------------------------------
