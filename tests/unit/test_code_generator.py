@@ -110,3 +110,113 @@ def test_modify_cmakelists_malformed(tmp_path):
     cmakelists.write_text("cmake_minimum_required(VERSION 3.8)")
     with pytest.raises(ValueError):
         CodeGenerator.modify_cmakelists(str(cmakelists), "node")
+
+# ── Lifecycle node tests ────────────────────────────────────────────
+
+def test_generate_python_lifecycle_node_creates_file(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_lifecycle_node"
+
+    generated_file = CodeGenerator.generate_python_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    assert os.path.exists(generated_file)
+    assert generated_file.endswith("my_lifecycle_node.py")
+
+    # __init__.py should also be created
+    assert os.path.exists(os.path.join(package_dir, package_name, "__init__.py"))
+
+
+def test_generate_python_lifecycle_node_imports(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_lifecycle_node"
+
+    generated_file = CodeGenerator.generate_python_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert "from rclpy.lifecycle import LifecycleNode" in content
+    assert "from rclpy.lifecycle import TransitionCallbackReturn" in content
+
+
+def test_generate_python_lifecycle_node_class_structure(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_lifecycle_node"
+
+    generated_file = CodeGenerator.generate_python_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert "class My_lifecycle_nodeNode(LifecycleNode):" in content
+    assert "super().__init__('my_lifecycle_node')" in content
+    assert "def main(args=None):" in content
+
+
+def test_generate_python_lifecycle_node_callbacks_present(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_lifecycle_node"
+
+    generated_file = CodeGenerator.generate_python_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    for callback in [
+        "on_configure",
+        "on_activate",
+        "on_deactivate",
+        "on_cleanup",
+        "on_shutdown",
+        "on_error"
+    ]:
+        assert f"def {callback}(self, state):" in content, f"Missing callback: {callback}"
+
+
+def test_generate_python_lifecycle_node_callbacks_return_success(tmp_path):
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_lifecycle_node"
+
+    generated_file = CodeGenerator.generate_python_lifecycle_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    # All callbacks except on_error should have a non-error return
+    assert content.count("return TransitionCallbackReturn.SUCCESS") == 6
+
+
+def test_generate_python_node_unchanged(tmp_path):
+    """Regression test: normal node generation output is unchanged."""
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_python_node"
+
+    generated_file = CodeGenerator.generate_python_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    # Should NOT contain lifecycle imports or classes
+    assert "LifecycleNode" not in content
+    assert "TransitionCallbackReturn" not in content
+    assert "on_configure" not in content
+    assert "from rclpy.node import Node" in content
+    assert "class My_python_nodeNode(Node):" in content
