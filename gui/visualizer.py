@@ -5,6 +5,22 @@ from PySide6.QtCore import Qt, QRectF, QThread, Signal
 from PySide6.QtGui import QBrush, QPen, QColor
 from core.ros2_cli import ROS2CLI
 
+
+def _safe_stop_thread(thread, timeout_ms=3000):
+    """Safely stop a QThread with bounded wait.  Idempotent."""
+    if thread is None:
+        return
+    try:
+        if thread.isRunning():
+            if hasattr(thread, 'requestInterruption'):
+                thread.requestInterruption()
+            if hasattr(thread, 'quit'):
+                thread.quit()
+            thread.wait(timeout_ms)
+    except RuntimeError:
+        pass  # Qt object may already be deleted
+
+
 class TopologyWorker(QThread):
     finished_signal = Signal(dict)
 
@@ -159,3 +175,10 @@ class VisualizerPage(QWidget):
         if self.last_plain_output:
             self.scene.clear()
             self.parse_and_draw(self.last_plain_output)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop topology worker."""
+        try:
+            _safe_stop_thread(self.worker)
+        except Exception:
+            pass  # best-effort cleanup

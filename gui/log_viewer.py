@@ -13,6 +13,21 @@ from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 from gui.theme import ThemeManager
 
 
+def _safe_stop_thread(thread, timeout_ms=3000):
+    """Safely stop a QThread with bounded wait.  Idempotent."""
+    if thread is None:
+        return
+    try:
+        if thread.isRunning():
+            if hasattr(thread, 'requestInterruption'):
+                thread.requestInterruption()
+            if hasattr(thread, 'quit'):
+                thread.quit()
+            thread.wait(timeout_ms)
+    except RuntimeError:
+        pass  # Qt object may already be deleted
+
+
 class LogTailerThread(QThread):
     """Tails a ROS 2 log file in the background and emits new lines."""
     new_line = Signal(str)
@@ -426,10 +441,18 @@ class UnifiedLogViewerPage(QWidget):
             self._live_logs.clear()
 
     def closeEvent(self, event):
-        if self.tailer_thread:
-            self.tailer_thread.stop()
-            self.tailer_thread.wait(1000)
+        self.cleanup()
         super().closeEvent(event)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop log tailer thread."""
+        try:
+            if self.tailer_thread is not None:
+                self.tailer_thread.stop()
+                self.tailer_thread.wait(1000)
+                self.tailer_thread = None
+        except Exception:
+            pass  # best-effort cleanup
 
     def refresh_theme(self):
         p = ThemeManager.palette()

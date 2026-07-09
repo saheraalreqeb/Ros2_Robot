@@ -24,6 +24,21 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal
 
 
+def _safe_stop_thread(thread, timeout_ms=3000):
+    """Safely stop a QThread with bounded wait.  Idempotent."""
+    if thread is None:
+        return
+    try:
+        if thread.isRunning():
+            if hasattr(thread, 'requestInterruption'):
+                thread.requestInterruption()
+            if hasattr(thread, 'quit'):
+                thread.quit()
+            thread.wait(timeout_ms)
+    except RuntimeError:
+        pass  # Qt object may already be deleted
+
+
 # ---------------------------------------------------------------------------
 #  Worker threads
 # ---------------------------------------------------------------------------
@@ -676,11 +691,15 @@ class ServiceInspectorPage(QWidget):
             f"QSplitter::handle {{ background-color: {p['border']}; }}"
         )
 
+    def cleanup(self):
+        """Idempotent shutdown – stop all workers."""
+        try:
+            _safe_stop_thread(self._list_worker)
+            _safe_stop_thread(self._info_worker)
+            _safe_stop_thread(self._call_worker)
+        except Exception:
+            pass  # best-effort cleanup
+
     def closeEvent(self, event):
-        if self._list_worker is not None:
-            self._list_worker.wait(1000)
-        if self._info_worker is not None:
-            self._info_worker.wait(1000)
-        if self._call_worker is not None:
-            self._call_worker.wait(1000)
+        self.cleanup()
         super().closeEvent(event)

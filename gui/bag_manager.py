@@ -26,6 +26,21 @@ from PySide6.QtCore import Qt, QTimer, QThread, Signal
 from gui.theme import ThemeManager
 
 
+def _safe_stop_thread(thread, timeout_ms=3000):
+    """Safely stop a QThread with bounded wait.  Idempotent."""
+    if thread is None:
+        return
+    try:
+        if thread.isRunning():
+            if hasattr(thread, 'requestInterruption'):
+                thread.requestInterruption()
+            if hasattr(thread, 'quit'):
+                thread.quit()
+            thread.wait(timeout_ms)
+    except RuntimeError:
+        pass  # Qt object may already be deleted
+
+
 # ---------------------------------------------------------------------------
 # Helper: build a shell command string that sources the workspace first
 # ---------------------------------------------------------------------------
@@ -837,3 +852,34 @@ class BagManagerPage(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete bag:\n{e}")
             self._scan_existing_bags()
+
+    def cleanup(self):
+        """Idempotent shutdown – stop all workers, timers, and subprocesses."""
+        try:
+            _safe_stop_thread(self._list_worker)
+            if self._record_timer.isActive():
+                self._record_timer.stop()
+            if self._play_poll_timer.isActive():
+                self._play_poll_timer.stop()
+            self._stop_recording()
+            # Stop play subprocess similar to _stop_recording pattern
+            if self._play_proc is not None:
+                try:
+                    if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                        os.killpg(os.getpgid(self._play_proc.pid), signal.SIGINT)
+                        try:
+                            self._play_proc.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(os.getpgid(self._play_proc.pid), signal.SIGKILL)
+                            self._play_proc.wait(timeout=2)
+                    else:
+                        self._play_proc.terminate()
+                        self._play_proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        self._play_proc.kill()
+                    except Exception:
+                        pass
+                self._play_proc = None
+        except Exception:
+            pass  # best-effort cleanup

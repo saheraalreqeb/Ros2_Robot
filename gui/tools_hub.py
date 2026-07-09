@@ -20,6 +20,21 @@ from PySide6.QtWidgets import (
 from gui.theme import ThemeManager
 
 
+def _safe_stop_thread(thread, timeout_ms=3000):
+    """Safely stop a QThread with bounded wait.  Idempotent."""
+    if thread is None:
+        return
+    try:
+        if thread.isRunning():
+            if hasattr(thread, 'requestInterruption'):
+                thread.requestInterruption()
+            if hasattr(thread, 'quit'):
+                thread.quit()
+            thread.wait(timeout_ms)
+    except RuntimeError:
+        pass  # Qt object may already be deleted
+
+
 TOOLS = [
     {
         "name":        "RViz2",
@@ -429,3 +444,11 @@ class ToolsHubPage(QWidget):
             row = self._rows.get(name)
             if row:
                 row.set_installed(installed)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop install check thread if running."""
+        try:
+            thread = getattr(self, '_check_thread', None)
+            _safe_stop_thread(thread)
+        except Exception:
+            pass  # best-effort cleanup
