@@ -301,8 +301,9 @@ int main(int argc, char * argv[])
         """
         Modifies an existing CMakeLists.txt to add executable, ament_target_dependencies,
         and install directives for a new C++ node.
-        When lifecycle=True, also adds rclcpp_lifecycle to dependencies and ensures
-        find_package(rclcpp_lifecycle REQUIRED) is present.
+        When lifecycle=True, also ensures find_package(rclcpp REQUIRED) and
+        find_package(rclcpp_lifecycle REQUIRED) are present, and adds rclcpp_lifecycle
+        to target dependencies.
         Raises an error if the insertion point cannot be found.
         """
         if not os.path.exists(cmakelists_path):
@@ -328,17 +329,75 @@ int main(int argc, char * argv[])
                 content = "find_package(rclcpp REQUIRED)\n" + content
 
         if lifecycle:
-            # Ensure find_package(rclcpp_lifecycle REQUIRED) is present
-            if 'find_package(rclcpp_lifecycle' not in content:
-                find_rclcpp_line = 'find_package(rclcpp REQUIRED)'
-                # Find the right variant
-                for line in content.split('\n'):
+            def _find_insertion_point(text: str) -> int:
+                """Return the character index where missing find_package lines
+                should be inserted, using priority:
+                1) after find_package(ament_cmake REQUIRED)
+                2) before if(BUILD_TESTING)
+                3) before first add_executable
+                4) before ament_package()
+                5) end of text
+                """
+                # 1) After find_package(ament_cmake REQUIRED)
+                anchor = 'find_package(ament_cmake REQUIRED)'
+                if anchor in text:
+                    return text.index(anchor) + len(anchor)
+
+                # 2) Before if(BUILD_TESTING)
+                for marker in ['if(BUILD_TESTING)', 'if (BUILD_TESTING)']:
+                    if marker in text:
+                        # Insert before the line, with a newline separator
+                        idx = text.index(marker)
+                        line_start = text.rfind('\n', 0, idx)
+                        return line_start if line_start != -1 else 0
+
+                # 3) Before first add_executable
+                if 'add_executable(' in text:
+                    idx = text.index('add_executable(')
+                    line_start = text.rfind('\n', 0, idx)
+                    return line_start if line_start != -1 else 0
+
+                # 4) Before ament_package()
+                if 'ament_package()' in text:
+                    idx = text.index('ament_package()')
+                    line_start = text.rfind('\n', 0, idx)
+                    return line_start if line_start != -1 else 0
+
+                # 5) End of text
+                return len(text)
+
+            def _find_line(text: str, pkg: str) -> str:
+                """Look for an existing find_package line for pkg (any variant).
+                Returns the matching line, or empty string if not found."""
+                for line in text.split('\n'):
                     stripped = line.strip()
-                    if stripped.startswith('find_package(rclcpp') and 'REQUIRED' in stripped:
-                        find_rclcpp_line = line
-                        break
-                replacement = f"{find_rclcpp_line}\nfind_package(rclcpp_lifecycle REQUIRED)"
-                content = content.replace(find_rclcpp_line, replacement, 1)
+                    if stripped.startswith(f'find_package({pkg}') and 'REQUIRED' in stripped:
+                        return line
+                return ''
+
+            required_pkgs = []
+            for pkg in ('rclcpp', 'rclcpp_lifecycle'):
+                find_line = f'find_package({pkg} REQUIRED)'
+                if find_line in content:
+                    continue  # Already present
+                existing = _find_line(content, pkg)
+                if existing:
+                    # Normalize existing variant to standard form
+                    content = content.replace(existing, find_line, 1)
+                    continue
+                required_pkgs.append(find_line)
+
+            if required_pkgs:
+                insert_at = _find_insertion_point(content)
+                # Ensure clean separation: newline before first new entry if not at start
+                prefix = content[:insert_at]
+                suffix = content[insert_at:]
+                if insert_at > 0 and not prefix.endswith('\n'):
+                    prefix += '\n'
+                if not suffix.startswith('\n'):
+                    suffix = '\n' + suffix
+                new_lines = '\n'.join(required_pkgs)
+                content = prefix + new_lines + suffix
 
             deps = "rclcpp rclcpp_lifecycle"
         else:

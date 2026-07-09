@@ -331,8 +331,33 @@ ament_package()
 
     assert "add_executable(my_lc_node src/my_lc_node.cpp)" in content
     assert "ament_target_dependencies(my_lc_node rclcpp rclcpp_lifecycle)" in content
+    assert "find_package(rclcpp REQUIRED)" in content
     assert "find_package(rclcpp_lifecycle REQUIRED)" in content
     assert "install(TARGETS my_lc_node" in content
+
+
+def test_modify_cmakelists_lifecycle_adds_both_when_missing(tmp_path):
+    """When neither find_package line exists, both must be added."""
+    cmakelists = tmp_path / "CMakeLists.txt"
+    cmakelists.write_text("""cmake_minimum_required(VERSION 3.8)
+project(test_pkg)
+
+ament_package()
+""")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "my_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        content = f.read()
+
+    assert "find_package(rclcpp REQUIRED)" in content
+    assert "find_package(rclcpp_lifecycle REQUIRED)" in content
+    # Both find_package lines must appear before ament_target_dependencies
+    idx_rclcpp = content.index("find_package(rclcpp REQUIRED)")
+    idx_rclcpp_lc = content.index("find_package(rclcpp_lifecycle REQUIRED)")
+    idx_deps = content.index("ament_target_dependencies(my_lc_node")
+    assert idx_rclcpp < idx_deps
+    assert idx_rclcpp_lc < idx_deps
 
 
 def test_modify_cmakelists_lifecycle_idempotent(tmp_path):
@@ -357,8 +382,68 @@ ament_package()
         second_pass = f.read()
 
     assert first_pass == second_pass
-    # No duplication of find_package
+    # No duplication of find_package lines
+    assert first_pass.count("find_package(rclcpp REQUIRED)") == 1
     assert first_pass.count("find_package(rclcpp_lifecycle REQUIRED)") == 1
+
+
+def test_modify_cmakelists_lifecycle_inserts_after_ament_cmake(tmp_path):
+    """In a standard ROS 2 package, missing find_package lines must be
+    inserted immediately after find_package(ament_cmake REQUIRED)."""
+    cmakelists = tmp_path / "CMakeLists.txt"
+    cmakelists.write_text("""cmake_minimum_required(VERSION 3.8)
+project(test_pkg)
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+# uncomment the following section in order to fill in
+# further dependencies manually.
+# find_package(<dependency> REQUIRED)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()
+""")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "my_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        content = f.read()
+
+    # Both inserted after ament_cmake and before the comment block
+    idx_ament = content.index("find_package(ament_cmake REQUIRED)")
+    idx_rclcpp = content.index("find_package(rclcpp REQUIRED)")
+    idx_rclcpp_lc = content.index("find_package(rclcpp_lifecycle REQUIRED)")
+    idx_build = content.index("if(BUILD_TESTING)")
+
+    assert idx_ament < idx_rclcpp < idx_rclcpp_lc < idx_build, \
+        "find_package lines must be between ament_cmake and BUILD_TESTING"
+
+
+def test_modify_cmakelists_lifecycle_before_add_executable(tmp_path):
+    """When ament_cmake and BUILD_TESTING are missing, insert before
+    the first add_executable (which the injection also adds)."""
+    cmakelists = tmp_path / "CMakeLists.txt"
+    cmakelists.write_text("""cmake_minimum_required(VERSION 3.8)
+project(test_pkg)
+
+ament_package()
+""")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists), "other_lc_node", lifecycle=True)
+
+    with open(cmakelists, "r") as f:
+        content = f.read()
+
+    idx_rclcpp = content.index("find_package(rclcpp REQUIRED)")
+    idx_add = content.index("add_executable(other_lc_node")
+    assert idx_rclcpp < idx_add
+
+    # Also verify both exist
+    assert "find_package(rclcpp_lifecycle REQUIRED)" in content
 
 
 # ── package.xml lifecycle integration tests ──────────────────────────
