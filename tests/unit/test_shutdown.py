@@ -263,3 +263,19 @@ class TestLaunchManagerCleanup:
     def test_cleanup_is_syntactically_valid(self):
         src = _extract_cleanup_source(_PAGE_FILES["launch_manager"])
         ast.parse(src)
+
+
+# ---------------------------------------------------------------------------
+# Tests for FlowLayout safe destruction
+# ---------------------------------------------------------------------------
+
+class TestFlowLayoutDestructor:
+    """Tests for FlowLayout safe destruction — no __del__ at crash-prone Qt teardown."""
+
+    def test_no_del_method(self):
+        """FlowLayout must not define __del__ (Qt cleans up layouts on parent destruction)."""
+        source = Path("gui/flow_layout.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "__del__":
+                pytest.fail("FlowLayout must NOT define __del__ — use Qt's built-in cleanup")
