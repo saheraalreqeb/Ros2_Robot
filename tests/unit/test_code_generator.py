@@ -220,3 +220,52 @@ def test_generate_python_node_unchanged(tmp_path):
     assert "on_configure" not in content
     assert "from rclpy.node import Node" in content
     assert "class My_python_nodeNode(Node):" in content
+
+# ── C++ lifecycle node (unsupported fallback) tests ──────────────────
+
+def test_generate_cpp_lifecycle_node_exists():
+    """The method must exist on CodeGenerator."""
+    assert hasattr(CodeGenerator, "generate_cpp_lifecycle_node")
+    assert callable(CodeGenerator.generate_cpp_lifecycle_node)
+
+
+def test_generate_cpp_lifecycle_node_raises(tmp_path):
+    """C++ lifecycle node generation must raise NotImplementedError
+    with a clear Python-only message."""
+    with pytest.raises(NotImplementedError) as exc_info:
+        CodeGenerator.generate_cpp_lifecycle_node(
+            str(tmp_path), "test_pkg", "my_cpp_lc_node"
+        )
+    assert "Python only" in str(exc_info.value)
+
+
+def test_generate_cpp_lifecycle_node_does_not_create_file(tmp_path):
+    """Raising must not leave a .cpp file behind."""
+    node_name = "my_cpp_lc_node"
+    try:
+        CodeGenerator.generate_cpp_lifecycle_node(
+            str(tmp_path), "test_pkg", node_name
+        )
+    except NotImplementedError:
+        pass
+
+    cpp_file = tmp_path / "src" / f"{node_name}.cpp"
+    assert not cpp_file.exists()
+
+
+def test_generate_cpp_node_unchanged(tmp_path):
+    """Regression: normal C++ node generation is untouched."""
+    package_dir = tmp_path
+    package_name = "test_pkg"
+    node_name = "my_cpp_node"
+
+    generated_file = CodeGenerator.generate_cpp_node(
+        str(package_dir), package_name, node_name
+    )
+
+    with open(generated_file, "r") as f:
+        content = f.read()
+
+    assert "class My_cpp_nodeNode : public rclcpp::Node" in content
+    assert "LifecycleNode" not in content
+    assert "lifecycle" not in content.lower()

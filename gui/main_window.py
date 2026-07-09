@@ -2610,13 +2610,18 @@ class MainWindow(QMainWindow):
                         pkg_name, node_name
                     )
                 elif lang == "cpp":
-                    CodeGenerator.generate_cpp_node(
-                        pkg_info["path"], pkg_name, node_name
-                    )
-                    CodeGenerator.modify_cmakelists(
-                        os.path.join(pkg_info["path"], "CMakeLists.txt"),
-                        node_name
-                    )
+                    if node_type == "Lifecycle Node":
+                        CodeGenerator.generate_cpp_lifecycle_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
+                    else:
+                        CodeGenerator.generate_cpp_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
+                        CodeGenerator.modify_cmakelists(
+                            os.path.join(pkg_info["path"], "CMakeLists.txt"),
+                            node_name
+                        )
                 QMessageBox.information(
                     self, "Success",
                     f"Node '{node_name}' added to '{pkg_name}'."

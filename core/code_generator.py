@@ -143,6 +143,16 @@ int main(int argc, char * argv[])
         return target_file
 
     @staticmethod
+    def generate_cpp_lifecycle_node(package_dir: str, package_name: str, node_name: str) -> str:
+        """
+        C++ lifecycle node generation is not yet supported.
+        Raises NotImplementedError with a clear message.
+        """
+        raise NotImplementedError(
+            "Lifecycle node generation is currently supported for Python only."
+        )
+
+    @staticmethod
     def modify_setup_py(setup_py_path: str, package_name: str, node_name: str, module_name: str = None):
         """
         Modifies an existing setup.py to safely insert the new entry_point for a python node.
