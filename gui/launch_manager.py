@@ -32,6 +32,9 @@ if "pytest" in sys.modules:
 from gui.theme import ThemeManager
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 # ─── Semantic colors (theme-independent) ─────────────────────────────────────
 COLOR_GREEN    = "#27ae60"
 COLOR_RED      = "#e74c3c"
@@ -219,12 +222,12 @@ class LaunchManagerPage(QWidget):
 
         start = self._displayed_launch_count
         end = min(start + PAGE_SIZE, len(self._all_launch_data))
-        
+
         for i in range(start, end):
             info = self._all_launch_data[i]
             card = self._make_launch_card(info)
             self._cards_layout.addWidget(card)
-            
+
         self._displayed_launch_count = end
 
     def _on_launch_scroll(self, value: int) -> None:
@@ -267,14 +270,14 @@ class LaunchManagerPage(QWidget):
         # Top row: Name and IDE button
         row_top = QHBoxLayout()
         row_top.setSpacing(4)
-        
+
         lbl_name = QLabel(info["filename"])
         lbl_name.setStyleSheet("font-size: 14px; font-weight: bold;")
         lbl_name.setWordWrap(True)
         lbl_name.setToolTip(info["filename"])
         row_top.addWidget(lbl_name)
         row_top.addStretch()
-        
+
         btn_ide = QPushButton()
         btn_ide.setToolTip("Open launch file in IDE")
         btn_ide.setFixedSize(24, 24)
@@ -285,15 +288,15 @@ class LaunchManagerPage(QWidget):
             btn_ide.setIcon(ThemeManager.icon("fa5s.external-link-alt", "accent"))
         except Exception:
             btn_ide.setText("↗")
-            
+
         def open_file():
             main_win = self.window()
             if hasattr(main_win, "_open_in_ide"):
                 main_win._open_in_ide(info["filepath"])
-                
+
         btn_ide.clicked.connect(open_file)
         row_top.addWidget(btn_ide)
-        
+
         lay.addLayout(row_top)
 
         # Package
@@ -352,7 +355,7 @@ class LaunchManagerPage(QWidget):
         if key in self.running_launches:
             proc = self.running_launches[key]
             use_wsl = bool(self.cli and self.cli.use_wsl)
-            
+
             # 1. Terminate the wrapper process
             if proc is not None and isinstance(proc, subprocess.Popen):
                 proc.terminate()
@@ -360,7 +363,7 @@ class LaunchManagerPage(QWidget):
                     proc.wait(timeout=2)
                 except Exception:
                     proc.kill()
-            
+
             # 2. Kill the underlying ros2 launch process tree inside WSL or Linux
             try:
                 if use_wsl:
@@ -369,10 +372,10 @@ class LaunchManagerPage(QWidget):
                     subprocess.run(["pkill", "-f", f"ros2 launch.*{filename}"], capture_output=True)
             except Exception:
                 pass
-                
+
             if key in self.running_launches:
                 del self.running_launches[key]
-                
+
             btn.setText("Launch")
             self._update_btn_class(btn, "btn-success")
             return
@@ -531,6 +534,15 @@ class LaunchManagerPage(QWidget):
         else:
             if dlg.exec() == QDialog.Accepted:
                 self.refresh_file_list()
+
+    def cleanup(self):
+        """Idempotent shutdown – stop monitor timer without terminating launches."""
+        try:
+            timer = getattr(self, 'monitor_timer', None)
+            if timer is not None and timer.isActive():
+                timer.stop()
+        except Exception:
+            pass  # best-effort cleanup
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -877,7 +889,7 @@ class LaunchBuilderDialog(QDialog):
                         if f.endswith('.launch.py') or f.endswith('.launch.xml') or f.endswith('.launch.yaml'):
                             rel = os.path.relpath(os.path.join(root, f), pkg_path)
                             found_files.append(rel.replace('\\', '/'))
-            
+
             for f in sorted(list(set(found_files))):
                 self.cmb_include_file.addItem(f)
 

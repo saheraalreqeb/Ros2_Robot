@@ -27,6 +27,9 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QFont
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 # ---------------------------------------------------------------------------
 #  Worker threads
 # ---------------------------------------------------------------------------
@@ -957,10 +960,18 @@ class TopicInspectorPage(QWidget):
 
     def closeEvent(self, event):
         """Ensure subprocesses are killed when the widget is closed."""
-        self._stop_echo()
-        if self._hz_thread is not None:
-            self._hz_thread.wait(3000)
+        self.cleanup()
         super().closeEvent(event)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop all workers and subprocesses."""
+        try:
+            self._stop_echo()
+            _safe_stop_thread(self._hz_thread)
+            _safe_stop_thread(self._list_worker)
+            _safe_stop_thread(self._info_worker)
+        except Exception:
+            pass  # best-effort cleanup
 
     def refresh_theme(self):
         p = ThemeManager.palette()

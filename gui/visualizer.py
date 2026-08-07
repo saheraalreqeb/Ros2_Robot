@@ -5,6 +5,10 @@ from PySide6.QtCore import Qt, QRectF, QThread, Signal
 from PySide6.QtGui import QBrush, QPen, QColor
 from core.ros2_cli import ROS2CLI
 
+
+from gui.thread_utils import _safe_stop_thread
+
+
 class TopologyWorker(QThread):
     finished_signal = Signal(dict)
 
@@ -159,3 +163,10 @@ class VisualizerPage(QWidget):
         if self.last_plain_output:
             self.scene.clear()
             self.parse_and_draw(self.last_plain_output)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop topology worker."""
+        try:
+            _safe_stop_thread(self.worker)
+        except Exception:
+            pass  # best-effort cleanup
