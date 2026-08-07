@@ -11,11 +11,6 @@ class FlowLayout(QLayout):
         self._cached_height = -1
         self.setContentsMargins(margin, margin, margin, margin)
 
-    def __del__(self):
-        item = self.takeAt(0)
-        while item:
-            item = self.takeAt(0)
-
     def addItem(self, item):
         self._item_list.append(item)
         self.invalidate()

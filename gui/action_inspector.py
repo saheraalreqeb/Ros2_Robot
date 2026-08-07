@@ -9,6 +9,10 @@ from PySide6.QtWidgets import (
 )
 from gui.theme import ThemeManager
 
+
+from gui.thread_utils import _safe_stop_thread
+
+
 # ---------------------------------------------------------------------------
 #  Workers
 # ---------------------------------------------------------------------------
@@ -503,3 +507,12 @@ class ActionInspectorPage(QWidget):
             self.txt_goal_output.append("\n⚠ Goal execution canceled by user.")
         self.btn_send_goal.setEnabled(True)
         self.btn_cancel_goal.setEnabled(False)
+
+    def cleanup(self):
+        """Idempotent shutdown – cancel goal worker and stop other workers."""
+        try:
+            self._cancel_goal()
+            _safe_stop_thread(self._list_worker)
+            _safe_stop_thread(self._info_worker)
+        except Exception:
+            pass  # best-effort cleanup

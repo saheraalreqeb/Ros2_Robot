@@ -23,6 +23,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 # ---------------------------------------------------------------------------
 #  Worker threads
 # ---------------------------------------------------------------------------
@@ -566,3 +569,13 @@ class LifecycleManagerPage(QWidget):
         cursor = self._txt_output.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         self._txt_output.setTextCursor(cursor)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop all lifecycle workers."""
+        try:
+            _safe_stop_thread(self._list_worker)
+            _safe_stop_thread(self._state_worker)
+            _safe_stop_thread(self._transitions_worker)
+            _safe_stop_thread(self._set_worker)
+        except Exception:
+            pass  # best-effort cleanup

@@ -18,6 +18,9 @@ from PySide6.QtGui import QColor, QFont
 from gui.theme import ThemeManager
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 class MulticastTestThread(QThread):
     """
     Background worker to test UDP multicast loopback routing.
@@ -420,3 +423,11 @@ class DDSTroubleshooterPage(QWidget):
         # Trigger recommendations refresh to paint with new theme colors
         if not self.rec_card.isHidden():
             self._generate_recommendations(not multicast_failed)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop multicast worker if running."""
+        try:
+            thread = getattr(self, 'multicast_worker', None)
+            _safe_stop_thread(thread)
+        except Exception:
+            pass  # best-effort cleanup

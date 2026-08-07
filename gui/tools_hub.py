@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
 from gui.theme import ThemeManager
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 TOOLS = [
     {
         "name":        "RViz2",
@@ -429,3 +432,11 @@ class ToolsHubPage(QWidget):
             row = self._rows.get(name)
             if row:
                 row.set_installed(installed)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop install check thread if running."""
+        try:
+            thread = getattr(self, '_check_thread', None)
+            _safe_stop_thread(thread)
+        except Exception:
+            pass  # best-effort cleanup

@@ -79,6 +79,9 @@ from gui.lifecycle_manager import LifecycleManagerPage
 
 # ─── Thread helpers ────────────────────────────────────────────────────────────
 
+from gui.thread_utils import _safe_stop_thread
+
+
 class DiscoveryDaemon(QThread):
     updated = Signal(dict)
 
@@ -811,10 +814,55 @@ class MainWindow(QMainWindow):
         self.discovery_cache = data
 
     def _on_shutdown(self):
+        if not getattr(self, '_shutdown_done', False):
+            self._shutdown_threads()
+        self._save_settings()
+
+    def _shutdown_threads(self):
+        """Safely stop all QThread workers and timers before window close."""
+        self._shutdown_done = True
+
+        # ── Discovery daemon ──
         if hasattr(self, "discovery_daemon"):
             self.discovery_daemon.stop()
-            self.discovery_daemon.wait(2000)
-        self._save_settings()
+            _safe_stop_thread(self.discovery_daemon, 3000)
+
+        # ── Node monitor timer ──
+        if hasattr(self, "node_monitor_timer") and self.node_monitor_timer is not None:
+            self.node_monitor_timer.stop()
+
+        # ── Resource monitor worker ──
+        if hasattr(self, "_resource_worker") and self._resource_worker is not None:
+            _safe_stop_thread(self._resource_worker, 3000)
+
+        # ── Interactive build worker ──
+        if hasattr(self, "interactive_build_worker") and self.interactive_build_worker is not None:
+            if self.interactive_build_worker.isRunning():
+                self.interactive_build_worker.terminate_process()
+                _safe_stop_thread(self.interactive_build_worker, 3000)
+
+        # ── Background build thread ──
+        if hasattr(self, "_bg_build_thread") and self._bg_build_thread is not None:
+            _safe_stop_thread(self._bg_build_thread, 3000)
+
+        # ── Running process log readers ──
+        for key, proc in list(getattr(self, "running_processes", {}).items()):
+            _safe_stop_thread(proc, 3000)
+        self.running_processes.clear()
+
+        # ── QStackedWidget page cleanup ──
+        if hasattr(self, "content_stack"):
+            for i in range(self.content_stack.count()):
+                widget = self.content_stack.widget(i)
+                if widget is None:
+                    continue
+                if widget.property("is_placeholder"):
+                    continue
+                if hasattr(widget, "cleanup"):
+                    try:
+                        widget.cleanup()
+                    except Exception:
+                        pass
 
     def _open_in_ide(self, target_path: str):
         """
@@ -2671,6 +2719,7 @@ class MainWindow(QMainWindow):
     # ── Window close ──────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
+        self._shutdown_threads()
         self._save_settings()
         # Terminate running launches
         if getattr(self, "_launch_manager_page", None) is not None:

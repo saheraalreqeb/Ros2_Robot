@@ -29,6 +29,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal
 
 
+from gui.thread_utils import _safe_stop_thread
+
+
 # ---------------------------------------------------------------------------
 #  Background worker – keeps the UI responsive while running ros2 commands
 # ---------------------------------------------------------------------------
@@ -496,3 +499,12 @@ class ParameterManagerPage(QWidget):
     def _set_status(self, msg: str):
         """Update the status label at the bottom of the page."""
         self.lbl_status.setText(msg)
+
+    def cleanup(self):
+        """Idempotent shutdown – stop all running workers."""
+        try:
+            for worker in self._workers:
+                _safe_stop_thread(worker)
+            self._workers.clear()
+        except Exception:
+            pass  # best-effort cleanup
