@@ -2689,6 +2689,9 @@ class MainWindow(QMainWindow):
                             os.path.join(pkg_info["path"], "CMakeLists.txt"),
                             node_name
                         )
+                        CodeGenerator.ensure_rclcpp_depend_in_package_xml(
+                            os.path.join(pkg_info["path"], "package.xml")
+                        )
                 QMessageBox.information(
                     self, "Success",
                     f"Node '{node_name}' added to '{pkg_name}'."

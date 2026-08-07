@@ -269,3 +269,25 @@ def test_generate_cpp_node_unchanged(tmp_path):
     assert "class My_cpp_nodeNode : public rclcpp::Node" in content
     assert "LifecycleNode" not in content
     assert "lifecycle" not in content.lower()
+
+
+def test_modify_cmakelists_adds_find_package_rclcpp(tmp_path):
+    cmakelists_path = tmp_path / "CMakeLists.txt"
+    cmakelists_path.write_text("find_package(ament_cmake REQUIRED)\nament_package()\n")
+
+    CodeGenerator.modify_cmakelists(str(cmakelists_path), "my_cpp_node")
+    content = cmakelists_path.read_text()
+
+    assert "find_package(rclcpp REQUIRED)" in content
+    assert "add_executable(my_cpp_node src/my_cpp_node.cpp)" in content
+    assert "ament_target_dependencies(my_cpp_node rclcpp)" in content
+
+
+def test_ensure_rclcpp_depend_in_package_xml(tmp_path):
+    package_xml = tmp_path / "package.xml"
+    package_xml.write_text("<package>\n  <name>test_pkg</name>\n</package>")
+
+    CodeGenerator.ensure_rclcpp_depend_in_package_xml(str(package_xml))
+    content = package_xml.read_text()
+
+    assert "<depend>rclcpp</depend>" in content

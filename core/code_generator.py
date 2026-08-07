@@ -204,7 +204,7 @@ int main(int argc, char * argv[])
     def modify_cmakelists(cmakelists_path: str, node_name: str):
         """
         Modifies an existing CMakeLists.txt to add executable, ament_target_dependencies,
-        and install directives for a new C++ node.
+        and install directives for a new C++ node. Ensures find_package(rclcpp REQUIRED) is present.
         Raises an error if the insertion point cannot be found.
         """
         if not os.path.exists(cmakelists_path):
@@ -220,6 +220,15 @@ int main(int argc, char * argv[])
         if 'ament_package()' not in content:
             raise ValueError(f"Could not find 'ament_package()' in {cmakelists_path} to insert node definitions.")
 
+        if "find_package(rclcpp REQUIRED)" not in content and "find_package(rclcpp" not in content:
+            if "find_package(ament_cmake REQUIRED)" in content:
+                content = content.replace(
+                    "find_package(ament_cmake REQUIRED)",
+                    "find_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)"
+                )
+            else:
+                content = "find_package(rclcpp REQUIRED)\n" + content
+
         injection = f"""
 add_executable({node_name} src/{node_name}.cpp)
 ament_target_dependencies({node_name} rclcpp)
@@ -232,3 +241,22 @@ install(TARGETS {node_name}
 
         with open(cmakelists_path, 'w') as f:
             f.write(new_content)
+
+    @staticmethod
+    def ensure_rclcpp_depend_in_package_xml(package_xml_path: str):
+        """
+        Ensures package.xml contains <depend>rclcpp</depend> for C++ nodes.
+        """
+        if not os.path.exists(package_xml_path):
+            return
+
+        with open(package_xml_path, 'r') as f:
+            content = f.read()
+
+        if 'rclcpp' in content:
+            return
+
+        if '</package>' in content:
+            new_content = content.replace('</package>', '  <depend>rclcpp</depend>\n</package>')
+            with open(package_xml_path, 'w') as f:
+                f.write(new_content)
