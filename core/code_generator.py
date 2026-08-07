@@ -1,6 +1,7 @@
 import os
 import re
 
+
 class CodeGenerator:
     @staticmethod
     def validate_package_language_compat(pkg_path: str, language: str) -> tuple[bool, str]:
@@ -49,16 +50,16 @@ if __name__ == '__main__':
         target_dir = os.path.join(package_dir, package_name)
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
-        
-        with open(target_file, 'w') as f:
+
+        with open(target_file, "w") as f:
             f.write(content)
-            
+
         # Also ensure __init__.py exists
-        init_file = os.path.join(target_dir, '__init__.py')
+        init_file = os.path.join(target_dir, "__init__.py")
         if not os.path.exists(init_file):
-            with open(init_file, 'w') as f:
+            with open(init_file, "w") as f:
                 pass
-                
+
         return target_file
 
     @staticmethod
@@ -116,12 +117,12 @@ if __name__ == '__main__':
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
 
-        with open(target_file, 'w') as f:
+        with open(target_file, "w") as f:
             f.write(content)
 
-        init_file = os.path.join(target_dir, '__init__.py')
+        init_file = os.path.join(target_dir, "__init__.py")
         if not os.path.exists(init_file):
-            with open(init_file, 'w') as f:
+            with open(init_file, "w") as f:
                 pass
 
         return target_file
@@ -152,13 +153,13 @@ int main(int argc, char * argv[])
 }}
 """
         node_file_name = f"{node_name}.cpp"
-        target_dir = os.path.join(package_dir, 'src')
+        target_dir = os.path.join(package_dir, "src")
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
-        
-        with open(target_file, 'w') as f:
+
+        with open(target_file, "w") as f:
             f.write(content)
-            
+
         return target_file
 
     @staticmethod
@@ -237,11 +238,11 @@ int main(int argc, char * argv[])
 }}
 """
         node_file_name = f"{node_name}.cpp"
-        target_dir = os.path.join(package_dir, 'src')
+        target_dir = os.path.join(package_dir, "src")
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
 
-        with open(target_file, 'w') as f:
+        with open(target_file, "w") as f:
             f.write(content)
 
         return target_file
@@ -260,7 +261,7 @@ int main(int argc, char * argv[])
         if not os.path.exists(setup_py_path):
             raise FileNotFoundError(f"setup.py not found at {setup_py_path}")
 
-        with open(setup_py_path, 'r') as f:
+        with open(setup_py_path, "r") as f:
             content = f.read()
 
         # Regex to find 'console_scripts': [ ... ]
@@ -281,19 +282,19 @@ int main(int argc, char * argv[])
 
         stripped_scripts = existing_scripts.strip()
         if stripped_scripts:
-            if not stripped_scripts.endswith(','):
-                existing_scripts = existing_scripts.rstrip() + ',\n            '
+            if not stripped_scripts.endswith(","):
+                existing_scripts = existing_scripts.rstrip() + ",\n            "
             else:
-                existing_scripts = existing_scripts.rstrip() + '\n            '
+                existing_scripts = existing_scripts.rstrip() + "\n            "
         else:
-            existing_scripts = '\n            '
+            existing_scripts = "\n            "
 
         new_script_line = f"'{entry_point_str}',\n        "
         new_scripts = existing_scripts + new_script_line
 
-        new_content = content[:match.start(2)] + new_scripts + content[match.end(2):]
+        new_content = content[: match.start(2)] + new_scripts + content[match.end(2) :]
 
-        with open(setup_py_path, 'w') as f:
+        with open(setup_py_path, "w") as f:
             f.write(new_content)
 
     @staticmethod
@@ -309,26 +310,28 @@ int main(int argc, char * argv[])
         if not os.path.exists(cmakelists_path):
             raise FileNotFoundError(f"CMakeLists.txt not found at {cmakelists_path}")
 
-        with open(cmakelists_path, 'r') as f:
+        with open(cmakelists_path, "r") as f:
             content = f.read()
 
         # Check if node is already added to avoid duplicates
         if f"add_executable({node_name}" in content:
             return
 
-        if 'ament_package()' not in content:
+        if "ament_package()" not in content:
             raise ValueError(f"Could not find 'ament_package()' in {cmakelists_path} to insert node definitions.")
 
-        if "find_package(rclcpp REQUIRED)" not in content and "find_package(rclcpp" not in content:
-            if "find_package(ament_cmake REQUIRED)" in content:
-                content = content.replace(
-                    "find_package(ament_cmake REQUIRED)",
-                    "find_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)"
-                )
-            else:
-                content = "find_package(rclcpp REQUIRED)\n" + content
+        if not lifecycle:
+            if "find_package(rclcpp REQUIRED)" not in content and "find_package(rclcpp" not in content:
+                if "find_package(ament_cmake REQUIRED)" in content:
+                    content = content.replace(
+                        "find_package(ament_cmake REQUIRED)",
+                        "find_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)",
+                    )
+                else:
+                    content = "find_package(rclcpp REQUIRED)\n" + content
 
         if lifecycle:
+
             def _find_insertion_point(text: str) -> int:
                 """Return the character index where missing find_package lines
                 should be inserted, using priority:
@@ -339,28 +342,28 @@ int main(int argc, char * argv[])
                 5) end of text
                 """
                 # 1) After find_package(ament_cmake REQUIRED)
-                anchor = 'find_package(ament_cmake REQUIRED)'
+                anchor = "find_package(ament_cmake REQUIRED)"
                 if anchor in text:
                     return text.index(anchor) + len(anchor)
 
                 # 2) Before if(BUILD_TESTING)
-                for marker in ['if(BUILD_TESTING)', 'if (BUILD_TESTING)']:
+                for marker in ["if(BUILD_TESTING)", "if (BUILD_TESTING)"]:
                     if marker in text:
                         # Insert before the line, with a newline separator
                         idx = text.index(marker)
-                        line_start = text.rfind('\n', 0, idx)
+                        line_start = text.rfind("\n", 0, idx)
                         return line_start if line_start != -1 else 0
 
                 # 3) Before first add_executable
-                if 'add_executable(' in text:
-                    idx = text.index('add_executable(')
-                    line_start = text.rfind('\n', 0, idx)
+                if "add_executable(" in text:
+                    idx = text.index("add_executable(")
+                    line_start = text.rfind("\n", 0, idx)
                     return line_start if line_start != -1 else 0
 
                 # 4) Before ament_package()
-                if 'ament_package()' in text:
-                    idx = text.index('ament_package()')
-                    line_start = text.rfind('\n', 0, idx)
+                if "ament_package()" in text:
+                    idx = text.index("ament_package()")
+                    line_start = text.rfind("\n", 0, idx)
                     return line_start if line_start != -1 else 0
 
                 # 5) End of text
@@ -369,15 +372,15 @@ int main(int argc, char * argv[])
             def _find_line(text: str, pkg: str) -> str:
                 """Look for an existing find_package line for pkg (any variant).
                 Returns the matching line, or empty string if not found."""
-                for line in text.split('\n'):
+                for line in text.split("\n"):
                     stripped = line.strip()
-                    if stripped.startswith(f'find_package({pkg}') and 'REQUIRED' in stripped:
+                    if stripped.startswith(f"find_package({pkg}") and "REQUIRED" in stripped:
                         return line
-                return ''
+                return ""
 
             required_pkgs = []
-            for pkg in ('rclcpp', 'rclcpp_lifecycle'):
-                find_line = f'find_package({pkg} REQUIRED)'
+            for pkg in ("rclcpp", "rclcpp_lifecycle"):
+                find_line = f"find_package({pkg} REQUIRED)"
                 if find_line in content:
                     continue  # Already present
                 existing = _find_line(content, pkg)
@@ -392,11 +395,11 @@ int main(int argc, char * argv[])
                 # Ensure clean separation: newline before first new entry if not at start
                 prefix = content[:insert_at]
                 suffix = content[insert_at:]
-                if insert_at > 0 and not prefix.endswith('\n'):
-                    prefix += '\n'
-                if not suffix.startswith('\n'):
-                    suffix = '\n' + suffix
-                new_lines = '\n'.join(required_pkgs)
+                if insert_at > 0 and not prefix.endswith("\n"):
+                    prefix += "\n"
+                if not suffix.startswith("\n"):
+                    suffix = "\n" + suffix
+                new_lines = "\n".join(required_pkgs)
                 content = prefix + new_lines + suffix
 
             deps = "rclcpp rclcpp_lifecycle"
@@ -411,9 +414,9 @@ install(TARGETS {node_name}
   DESTINATION lib/${{PROJECT_NAME}}
 )
 """
-        new_content = content.replace('ament_package()', f'{injection}\nament_package()')
+        new_content = content.replace("ament_package()", f"{injection}\nament_package()")
 
-        with open(cmakelists_path, 'w') as f:
+        with open(cmakelists_path, "w") as f:
             f.write(new_content)
 
     @staticmethod
@@ -424,15 +427,15 @@ install(TARGETS {node_name}
         if not os.path.exists(package_xml_path):
             return
 
-        with open(package_xml_path, 'r') as f:
+        with open(package_xml_path, "r") as f:
             content = f.read()
 
-        if 'rclcpp' in content:
+        if "rclcpp" in content:
             return
 
-        if '</package>' in content:
-            new_content = content.replace('</package>', '  <depend>rclcpp</depend>\n</package>')
-            with open(package_xml_path, 'w') as f:
+        if "</package>" in content:
+            new_content = content.replace("</package>", "  <depend>rclcpp</depend>\n</package>")
+            with open(package_xml_path, "w") as f:
                 f.write(new_content)
 
     @staticmethod
@@ -444,7 +447,7 @@ install(TARGETS {node_name}
         if not os.path.exists(package_xml_path):
             raise FileNotFoundError(f"package.xml not found at {package_xml_path}")
 
-        with open(package_xml_path, 'r') as f:
+        with open(package_xml_path, "r") as f:
             content = f.read()
 
         depend_tag = f"<depend>{dependency}</depend>"
@@ -452,11 +455,12 @@ install(TARGETS {node_name}
             return  # Already present
 
         # Insert before the closing </package> tag
-        closing_tag = '</package>'
+        closing_tag = "</package>"
         if closing_tag not in content:
             raise ValueError(f"Could not find '</package>' in {package_xml_path}")
 
-        new_content = content.replace(closing_tag, f'  {depend_tag}\n{closing_tag}')
+        new_content = content.replace(closing_tag, f"  {depend_tag}\n{closing_tag}")
 
-        with open(package_xml_path, 'w') as f:
+        with open(package_xml_path, "w") as f:
+            f.write(new_content)
             f.write(new_content)
