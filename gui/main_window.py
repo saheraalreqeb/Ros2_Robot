@@ -83,7 +83,7 @@ from gui.thread_utils import _safe_stop_thread
 
 
 class DiscoveryDaemon(QThread):
-    updated = Signal(dict)
+    updated = Signal(object)
 
     def __init__(self, cli: ROS2CLI):
         super().__init__()
@@ -113,7 +113,7 @@ class DiscoveryDaemon(QThread):
 
 
 class ResourceMonitorWorker(QThread):
-    resources_updated = Signal(dict)
+    resources_updated = Signal(object)
 
     def run(self):
         import psutil
@@ -2116,25 +2116,28 @@ class MainWindow(QMainWindow):
             self._load_more_nodes()
 
     def _kill_all_running_nodes(self):
-        # Terminate GUI-managed processes
+        # Terminate GUI-managed subprocesses
         keys = list(self.running_processes.keys())
         for key in keys:
             proc = self.running_processes.get(key)
             if proc:
-                proc.terminate()
                 try:
-                    proc.wait(timeout=2)
+                    proc.terminate()
                 except Exception:
-                    proc.kill()
+                    pass
         self.running_processes.clear()
 
-        # Terminate any other node processes matching active cards
-        for card in getattr(self, "active_node_cards", []):
-            pkg = card.pkg_name
-            node = card.node_name
-            self._kill_node(pkg, node)
+        # Terminate system processes for nodes
+        running_procs = self._scan_running_processes()
+        for proc in running_procs.values():
+            try:
+                proc.terminate()
+            except Exception:
+                pass
 
-        # Refresh state
+        self._nodes_dirty = True
+        if hasattr(self, "_running_dict_cache"):
+            del self._running_dict_cache
         self._refresh_nodes_list()
 
     def _make_node_card(self, pkg_name: str, node_name: str, running_dict=None) -> QFrame:
@@ -2194,7 +2197,7 @@ class MainWindow(QMainWindow):
 
         lay.addStretch()
 
-        is_running = self._is_node_running(pkg_name, node_name)
+        is_running = self._is_node_running(pkg_name, node_name, running_dict)
         proc_key = f"{pkg_name}:{node_name}"
 
         btn_run = QPushButton()
