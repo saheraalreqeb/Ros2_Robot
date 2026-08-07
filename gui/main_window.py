@@ -1386,10 +1386,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "btn_pkg_sort"):
             if self._packages_sort_desc:
                 self.btn_pkg_sort.setText("Z-A")
-                self.btn_pkg_sort.setIcon(qta.icon("fa5s.sort-alpha-up", color=THEME["text_muted"]))
+                self.btn_pkg_sort.setIcon(ThemeManager.icon("fa5s.sort-alpha-up", "normal"))
             else:
                 self.btn_pkg_sort.setText("A-Z")
-                self.btn_pkg_sort.setIcon(qta.icon("fa5s.sort-alpha-down", color=THEME["text_muted"]))
+                self.btn_pkg_sort.setIcon(ThemeManager.icon("fa5s.sort-alpha-down", "normal"))
         self._update_filtered_packages()
 
     def _apply_packages_filter(self):
@@ -2159,10 +2159,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "btn_nodes_sort"):
             if self._nodes_sort_desc:
                 self.btn_nodes_sort.setText("Z-A")
-                self.btn_nodes_sort.setIcon(qta.icon("fa5s.sort-alpha-up", color=THEME["text_muted"]))
+                self.btn_nodes_sort.setIcon(ThemeManager.icon("fa5s.sort-alpha-up", "normal"))
             else:
                 self.btn_nodes_sort.setText("A-Z")
-                self.btn_nodes_sort.setIcon(qta.icon("fa5s.sort-alpha-down", color=THEME["text_muted"]))
+                self.btn_nodes_sort.setIcon(ThemeManager.icon("fa5s.sort-alpha-down", "normal"))
         self._update_filtered_nodes()
 
     def _apply_nodes_filter(self):
