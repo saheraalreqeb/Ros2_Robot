@@ -2227,6 +2227,7 @@ class MainWindow(QMainWindow):
             lambda _, p=pkg_name, n=node_name, b=btn_run:
             self._toggle_node_run(p, n, b)
         )
+        card.btn_run = btn_run
         lay.addWidget(btn_run, 0, Qt.AlignRight)
         return card
 
@@ -2405,7 +2406,8 @@ class MainWindow(QMainWindow):
                 
                 if hasattr(card, "btn_run") and card.btn_run.text() == "Stop":
                     card.btn_run.setText("Run")
-                    card.btn_run.setProperty("class", "btn-primary")
+                    card.btn_run.setProperty("class", "btn-success")
+                    card.btn_run.setStyleSheet("")
                     card.btn_run.style().unpolish(card.btn_run)
                     card.btn_run.style().polish(card.btn_run)
 
