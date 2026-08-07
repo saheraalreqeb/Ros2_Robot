@@ -43,6 +43,71 @@ if __name__ == '__main__':
         return target_file
 
     @staticmethod
+    def generate_python_lifecycle_node(package_dir: str, package_name: str, node_name: str) -> str:
+        """
+        Generates a Python lifecycle node using rclpy.lifecycle.LifecycleNode.
+        Returns the path to the generated file.
+        """
+        class_name = f"{node_name.capitalize()}Node"
+        content = f"""import rclpy
+from rclpy.lifecycle import LifecycleNode
+from rclpy.lifecycle import TransitionCallbackReturn
+
+class {class_name}(LifecycleNode):
+    def __init__(self):
+        super().__init__('{node_name}')
+        self.get_logger().info("Lifecycle node created: state = unconfigured")
+
+    def on_configure(self, state):
+        self.get_logger().info("on_configure() called")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state):
+        self.get_logger().info("on_activate() called")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_deactivate(self, state):
+        self.get_logger().info("on_deactivate() called")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_cleanup(self, state):
+        self.get_logger().info("on_cleanup() called")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state):
+        self.get_logger().info("on_shutdown() called")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_error(self, state):
+        self.get_logger().error("on_error() called")
+        return TransitionCallbackReturn.SUCCESS
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = {class_name}()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+"""
+        node_file_name = f"{node_name}.py"
+        target_dir = os.path.join(package_dir, package_name)
+        os.makedirs(target_dir, exist_ok=True)
+        target_file = os.path.join(target_dir, node_file_name)
+
+        with open(target_file, 'w') as f:
+            f.write(content)
+
+        init_file = os.path.join(target_dir, '__init__.py')
+        if not os.path.exists(init_file):
+            with open(init_file, 'w') as f:
+                pass
+
+        return target_file
+
+    @staticmethod
     def generate_cpp_node(package_dir: str, package_name: str, node_name: str) -> str:
         """
         Generates a boilerplate C++ node.
@@ -76,6 +141,16 @@ int main(int argc, char * argv[])
             f.write(content)
             
         return target_file
+
+    @staticmethod
+    def generate_cpp_lifecycle_node(package_dir: str, package_name: str, node_name: str) -> str:
+        """
+        C++ lifecycle node generation is not yet supported.
+        Raises NotImplementedError with a clear message.
+        """
+        raise NotImplementedError(
+            "Lifecycle node generation is currently supported for Python only."
+        )
 
     @staticmethod
     def modify_setup_py(setup_py_path: str, package_name: str, node_name: str, module_name: str = None):

@@ -55,7 +55,7 @@ class CreateNodeDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add ROS2 Node")
-        self.resize(400, 150)
+        self.resize(400, 200)
         self.setAttribute(Qt.WA_StyledBackground, True)
 
         layout = QVBoxLayout(self)
@@ -72,6 +72,10 @@ class CreateNodeDialog(QDialog):
         self.lang_combo = QComboBox()
         self.lang_combo.addItems(["python", "cpp"])
         form_layout.addRow("Language:", self.lang_combo)
+
+        self.node_type_combo = QComboBox()
+        self.node_type_combo.addItems(["Normal Node", "Lifecycle Node"])
+        form_layout.addRow("Node Type:", self.node_type_combo)
 
         layout.addLayout(form_layout)
 
@@ -92,5 +96,6 @@ class CreateNodeDialog(QDialog):
         return {
             "package": self.pkg_combo.currentText(),
             "name": self.name_edit.text().strip(),
-            "language": self.lang_combo.currentText()
+            "language": self.lang_combo.currentText(),
+            "node_type": self.node_type_combo.currentText()
         }

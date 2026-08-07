@@ -2587,6 +2587,7 @@ class MainWindow(QMainWindow):
             node_name = data["name"]
             pkg_name = data["package"]
             lang = data["language"]
+            node_type = data.get("node_type", "Normal Node")
             if not node_name:
                 QMessageBox.warning(self, "Warning", "Node name cannot be empty.")
                 return
@@ -2596,21 +2597,31 @@ class MainWindow(QMainWindow):
                 return
             try:
                 if lang == "python":
-                    CodeGenerator.generate_python_node(
-                        pkg_info["path"], pkg_name, node_name
-                    )
+                    if node_type == "Lifecycle Node":
+                        CodeGenerator.generate_python_lifecycle_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
+                    else:
+                        CodeGenerator.generate_python_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
                     CodeGenerator.modify_setup_py(
                         os.path.join(pkg_info["path"], "setup.py"),
                         pkg_name, node_name
                     )
                 elif lang == "cpp":
-                    CodeGenerator.generate_cpp_node(
-                        pkg_info["path"], pkg_name, node_name
-                    )
-                    CodeGenerator.modify_cmakelists(
-                        os.path.join(pkg_info["path"], "CMakeLists.txt"),
-                        node_name
-                    )
+                    if node_type == "Lifecycle Node":
+                        CodeGenerator.generate_cpp_lifecycle_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
+                    else:
+                        CodeGenerator.generate_cpp_node(
+                            pkg_info["path"], pkg_name, node_name
+                        )
+                        CodeGenerator.modify_cmakelists(
+                            os.path.join(pkg_info["path"], "CMakeLists.txt"),
+                            node_name
+                        )
                 QMessageBox.information(
                     self, "Success",
                     f"Node '{node_name}' added to '{pkg_name}'."
