@@ -60,7 +60,8 @@ from core.code_generator import CodeGenerator
 from core.ros2_cli import ROS2CLI
 from core.workspace import ROS2Workspace
 from gui.bag_manager import BagManagerPage
-from gui.dialogs import CreateNodeDialog, CreatePackageDialog
+from gui.dialogs import CreateNodeDialog, CreatePackageDialog, NodeProfileDialog
+from core.node_profiles import NodeProfileManager
 from gui.flow_layout import FlowLayout
 from gui.launch_manager import LaunchManagerPage
 from gui.parameter_manager import ParameterManagerPage
@@ -635,6 +636,8 @@ class MainWindow(QMainWindow):
     @current_workspace_path.setter
     def current_workspace_path(self, path: str) -> None:
         self._current_workspace_path_val = path
+        if hasattr(self, "node_profile_manager"):
+            self.node_profile_manager = NodeProfileManager(path)
         self._update_all_workspaces()
         if hasattr(self, "_save_settings"):
             self._save_settings()
@@ -666,6 +669,7 @@ class MainWindow(QMainWindow):
             self.cli.use_wsl = True
         self.running_processes: dict = {}
         self.active_node_cards: list = []
+        self.node_profile_manager = NodeProfileManager(self.current_workspace_path)
 
         # Central Discovery Cache and Daemon
         self.discovery_cache = {
@@ -1373,6 +1377,42 @@ class MainWindow(QMainWindow):
 
         self._all_packages_data = packages
         self._packages_dirty = False
+        
+        self._packages_sort_desc = getattr(self, "_packages_sort_desc", False)
+        self._update_filtered_packages()
+
+    def _toggle_pkg_sort(self):
+        self._packages_sort_desc = not getattr(self, "_packages_sort_desc", False)
+        if hasattr(self, "btn_pkg_sort"):
+            if self._packages_sort_desc:
+                self.btn_pkg_sort.setText("Z-A")
+                self.btn_pkg_sort.setIcon(qta.icon("fa5s.sort-alpha-up", color=THEME["text_muted"]))
+            else:
+                self.btn_pkg_sort.setText("A-Z")
+                self.btn_pkg_sort.setIcon(qta.icon("fa5s.sort-alpha-down", color=THEME["text_muted"]))
+        self._update_filtered_packages()
+
+    def _apply_packages_filter(self):
+        self._update_filtered_packages()
+
+    def _update_filtered_packages(self):
+        if not hasattr(self, "_all_packages_data"):
+            return
+            
+        search_text = ""
+        if hasattr(self, "packages_search_bar"):
+            search_text = self.packages_search_bar.text().strip().lower()
+            
+        self._filtered_packages_data = [
+            pkg for pkg in self._all_packages_data 
+            if search_text in pkg["name"].lower()
+        ]
+        
+        self._filtered_packages_data.sort(
+            key=lambda x: x["name"].lower(), 
+            reverse=getattr(self, "_packages_sort_desc", False)
+        )
+
         self._displayed_packages_count = 0
 
         while self._pkg_flow.count():
@@ -1380,8 +1420,8 @@ class MainWindow(QMainWindow):
             if item.widget():
                 item.widget().deleteLater()
 
-        if not self._all_packages_data:
-            lbl = QLabel(f"No packages found in:\n{self.current_workspace_path}")
+        if not self._filtered_packages_data:
+            lbl = QLabel(f"No packages match the current filter in:\n{self.current_workspace_path}")
             lbl.setStyleSheet("font-style: italic; font-size: 13px;")
             self._pkg_flow.addWidget(lbl)
             return
@@ -1390,14 +1430,14 @@ class MainWindow(QMainWindow):
 
     def _load_more_packages(self):
         PAGE_SIZE = 50
-        if not hasattr(self, "_all_packages_data") or self._displayed_packages_count >= len(self._all_packages_data):
+        if not hasattr(self, "_filtered_packages_data") or self._displayed_packages_count >= len(self._filtered_packages_data):
             return
 
         start = self._displayed_packages_count
-        end = min(start + PAGE_SIZE, len(self._all_packages_data))
+        end = min(start + PAGE_SIZE, len(self._filtered_packages_data))
         
         for i in range(start, end):
-            pkg = self._all_packages_data[i]
+            pkg = self._filtered_packages_data[i]
             card = self._make_package_card(pkg)
             self._pkg_flow.addWidget(card)
             
@@ -1938,6 +1978,17 @@ class MainWindow(QMainWindow):
         btn_add.clicked.connect(self._mock_create_package)
         toolbar_lay.addWidget(btn_add)
         toolbar_lay.addStretch()
+        
+        self.packages_search_bar = QLineEdit()
+        self.packages_search_bar.setPlaceholderText("Filter by name...")
+        self.packages_search_bar.textChanged.connect(self._apply_packages_filter)
+        self.packages_search_bar.setFixedWidth(200)
+        toolbar_lay.addWidget(self.packages_search_bar)
+        
+        self.btn_pkg_sort = _action_btn("A-Z", "fa5s.sort-alpha-down")
+        self.btn_pkg_sort.clicked.connect(self._toggle_pkg_sort)
+        toolbar_lay.addWidget(self.btn_pkg_sort)
+        
         outer_lay.addWidget(toolbar)
         outer_lay.addSpacing(18)
 
@@ -2005,7 +2056,31 @@ class MainWindow(QMainWindow):
             "Creates a boilerplate Python or C++ node script."
         )
         btn_add.clicked.connect(self._mock_add_node)
-        card_lay.addWidget(btn_add, 0, Qt.AlignLeft)
+        card_lay.addWidget(btn_add)
+        
+        card_lay_outer = QHBoxLayout()
+        card_lay_outer.addWidget(btn_add)
+        card_lay_outer.addStretch()
+        
+        self.nodes_search_bar = QLineEdit()
+        self.nodes_search_bar.setPlaceholderText("Filter by name...")
+        self.nodes_search_bar.textChanged.connect(self._apply_nodes_filter)
+        self.nodes_search_bar.setFixedWidth(200)
+        card_lay_outer.addWidget(self.nodes_search_bar)
+        
+        self.btn_nodes_sort = _action_btn("A-Z", "fa5s.sort-alpha-down")
+        self.btn_nodes_sort.clicked.connect(self._toggle_nodes_sort)
+        card_lay_outer.addWidget(self.btn_nodes_sort)
+        
+        # We need to set this layout properly on the card
+        # The original code did card_lay.addWidget(btn_add, 0, Qt.AlignLeft)
+        # So we clear card_lay and add our horizontal layout
+        while card_lay.count():
+            item = card_lay.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        card_lay.addLayout(card_lay_outer)
+        
         layout.addWidget(card)
         layout.addSpacing(18)
 
@@ -2074,6 +2149,43 @@ class MainWindow(QMainWindow):
 
         self._all_nodes_data = new_nodes_data
         self._nodes_dirty = False
+        self._nodes_sort_desc = getattr(self, "_nodes_sort_desc", False)
+        
+        self._running_dict_cache = self._scan_running_processes()
+        self._update_filtered_nodes()
+
+    def _toggle_nodes_sort(self):
+        self._nodes_sort_desc = not getattr(self, "_nodes_sort_desc", False)
+        if hasattr(self, "btn_nodes_sort"):
+            if self._nodes_sort_desc:
+                self.btn_nodes_sort.setText("Z-A")
+                self.btn_nodes_sort.setIcon(qta.icon("fa5s.sort-alpha-up", color=THEME["text_muted"]))
+            else:
+                self.btn_nodes_sort.setText("A-Z")
+                self.btn_nodes_sort.setIcon(qta.icon("fa5s.sort-alpha-down", color=THEME["text_muted"]))
+        self._update_filtered_nodes()
+
+    def _apply_nodes_filter(self):
+        self._update_filtered_nodes()
+
+    def _update_filtered_nodes(self):
+        if not hasattr(self, "_all_nodes_data"):
+            return
+            
+        search_text = ""
+        if hasattr(self, "nodes_search_bar"):
+            search_text = self.nodes_search_bar.text().strip().lower()
+            
+        self._filtered_nodes_data = [
+            (p, n) for p, n in self._all_nodes_data 
+            if search_text in p.lower() or search_text in n.lower()
+        ]
+        
+        self._filtered_nodes_data.sort(
+            key=lambda x: f"{x[0]}/{x[1]}".lower(), 
+            reverse=getattr(self, "_nodes_sort_desc", False)
+        )
+
         self._displayed_nodes_count = 0
         self.active_node_cards = []
 
@@ -2082,28 +2194,27 @@ class MainWindow(QMainWindow):
             if item.widget():
                 item.widget().deleteLater()
 
-        if not self._all_nodes_data:
-            lbl = QLabel(f"No nodes found in:\n{self.current_workspace_path}")
+        if not self._filtered_nodes_data:
+            lbl = QLabel(f"No nodes match the current filter in:\n{self.current_workspace_path}")
             lbl.setStyleSheet("font-style: italic; font-size: 13px;")
             self.nodes_flow_layout.addWidget(lbl)
             return
 
-        self._running_dict_cache = self._scan_running_processes()
         self._load_more_nodes()
 
     def _load_more_nodes(self):
         PAGE_SIZE = 50
-        if not hasattr(self, "_all_nodes_data") or self._displayed_nodes_count >= len(self._all_nodes_data):
+        if not hasattr(self, "_filtered_nodes_data") or self._displayed_nodes_count >= len(self._filtered_nodes_data):
             return
             
         start = self._displayed_nodes_count
-        end = min(start + PAGE_SIZE, len(self._all_nodes_data))
+        end = min(start + PAGE_SIZE, len(self._filtered_nodes_data))
         
         if not hasattr(self, "_running_dict_cache"):
             self._running_dict_cache = self._scan_running_processes()
             
         for i in range(start, end):
-            pkg_name, node_name = self._all_nodes_data[i]
+            pkg_name, node_name = self._filtered_nodes_data[i]
             card = self._make_node_card(pkg_name, node_name, self._running_dict_cache)
             self.nodes_flow_layout.addWidget(card)
             self.active_node_cards.append(card)
@@ -2181,6 +2292,18 @@ class MainWindow(QMainWindow):
         btn_ide.clicked.connect(lambda _, p=pkg_name, n=node_name: self._open_node_in_ide(p, n))
         row.addWidget(btn_ide)
         
+        btn_cfg = QPushButton()
+        btn_cfg.setToolTip("Configure Node Run Profile")
+        btn_cfg.setFixedSize(24, 24)
+        btn_cfg.setCursor(Qt.PointingHandCursor)
+        btn_cfg.setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background: rgba(128, 128, 128, 0.2); border-radius: 4px; }")
+        try:
+            btn_cfg.setIcon(ThemeManager.icon("fa5s.cog", "accent"))
+        except Exception:
+            btn_cfg.setText("⚙")
+        btn_cfg.clicked.connect(lambda _, p=pkg_name, n=node_name: self._configure_node_profile(p, n))
+        row.addWidget(btn_cfg)
+        
         lay.addLayout(row)
 
         lbl_pkg = QLabel(f"pkg: {pkg_name}")
@@ -2231,6 +2354,12 @@ class MainWindow(QMainWindow):
         lay.addWidget(btn_run, 0, Qt.AlignRight)
         return card
 
+    def _configure_node_profile(self, pkg_name: str, node_name: str):
+        dialog = NodeProfileDialog(self, self.node_profile_manager, pkg_name, node_name)
+        if dialog.exec():
+            data = dialog.get_data()
+            self.node_profile_manager.save_profile(pkg_name, node_name, data["profile_name"], data)
+            
     def _open_node_in_ide(self, pkg_name: str, node_name: str):
         import os
         from pathlib import Path
@@ -2326,6 +2455,22 @@ class MainWindow(QMainWindow):
             btn.style().unpolish(btn)
             btn.style().polish(btn)
         else:
+            # Load default/latest profile if available
+            profiles = self.node_profile_manager.load_profiles(pkg_name, node_name)
+            prof_data = profiles[0] if profiles else {}
+            app_args = prof_data.get("app_args", "").strip()
+            ros_args = prof_data.get("ros_args", "").strip()
+            prof_cwd = prof_data.get("working_directory", "").strip()
+            
+            args_str = ""
+            if ros_args:
+                args_str += f" --ros-args {ros_args}"
+            if app_args:
+                if not args_str:
+                    args_str += f" --ros-args -- {app_args}"
+                else:
+                    args_str += f" -- {app_args}"
+            
             setup_bash = os.path.join(
                 self.current_workspace_path, "install", "setup.bash"
             )
@@ -2333,17 +2478,20 @@ class MainWindow(QMainWindow):
                 setup_bash_wsl = to_wsl_path(setup_bash)
                 cmd = (
                     f'[ -f "{setup_bash_wsl}" ] && source "{setup_bash_wsl}"; '
-                    f"ros2 run {pkg_name} {node_name}"
+                    f"ros2 run {pkg_name} {node_name}{args_str}"
                 )
                 run_cmd = ["wsl", "bash", "-i", "-c", cmd]
                 cwd = None
             else:
                 if os.path.exists(setup_bash):
-                    cmd = f'source "{setup_bash}" && ros2 run {pkg_name} {node_name}'
+                    cmd = f'source "{setup_bash}" && ros2 run {pkg_name} {node_name}{args_str}'
                 else:
-                    cmd = f"ros2 run {pkg_name} {node_name}"
+                    cmd = f"ros2 run {pkg_name} {node_name}{args_str}"
                 run_cmd = ["bash", "-c", cmd]
                 cwd = self.current_workspace_path
+                
+            if prof_cwd and os.path.isdir(prof_cwd):
+                cwd = prof_cwd
 
             proc = subprocess.Popen(
                 run_cmd,
@@ -2662,6 +2810,12 @@ class MainWindow(QMainWindow):
             pkg_info = next((p for p in packages if p["name"] == pkg_name), None)
             if not pkg_info:
                 return
+
+            is_valid, err_msg = CodeGenerator.validate_package_language_compat(pkg_info["path"], lang)
+            if not is_valid:
+                QMessageBox.warning(self, "Incompatible Package", err_msg)
+                return
+
             try:
                 if lang == "python":
                     if node_type == "Lifecycle Node":

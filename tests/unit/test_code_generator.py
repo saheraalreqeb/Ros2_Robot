@@ -291,3 +291,29 @@ def test_ensure_rclcpp_depend_in_package_xml(tmp_path):
     content = package_xml.read_text()
 
     assert "<depend>rclcpp</depend>" in content
+
+def test_validate_package_language_compat(tmp_path):
+    from core.code_generator import CodeGenerator
+    pkg_path = tmp_path / "my_pkg"
+    pkg_path.mkdir()
+    
+    # Empty dir
+    valid, msg = CodeGenerator.validate_package_language_compat(str(pkg_path), "python")
+    assert not valid
+    assert "Cannot add a Python node" in msg
+    
+    valid, msg = CodeGenerator.validate_package_language_compat(str(pkg_path), "cpp")
+    assert not valid
+    assert "Cannot add a C++ node" in msg
+    
+    # Python pkg
+    (pkg_path / "setup.py").touch()
+    valid, msg = CodeGenerator.validate_package_language_compat(str(pkg_path), "python")
+    assert valid
+    assert msg == ""
+    
+    # Cpp pkg
+    (pkg_path / "CMakeLists.txt").touch()
+    valid, msg = CodeGenerator.validate_package_language_compat(str(pkg_path), "cpp")
+    assert valid
+    assert msg == ""

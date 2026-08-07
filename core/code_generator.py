@@ -3,6 +3,17 @@ import re
 
 class CodeGenerator:
     @staticmethod
+    def validate_package_language_compat(pkg_path: str, language: str) -> tuple[bool, str]:
+        """Returns (is_valid, error_message)."""
+        if language == "python":
+            if not os.path.exists(os.path.join(pkg_path, "setup.py")):
+                return False, "Cannot add a Python node to a C++ (ament_cmake) package."
+        elif language == "cpp":
+            if not os.path.exists(os.path.join(pkg_path, "CMakeLists.txt")):
+                return False, "Cannot add a C++ node to a Python (ament_python) package."
+        return True, ""
+
+    @staticmethod
     def generate_python_node(package_dir: str, package_name: str, node_name: str) -> str:
         """
         Generates a boilerplate 'Hello World' Python node inside a target package's directory.
