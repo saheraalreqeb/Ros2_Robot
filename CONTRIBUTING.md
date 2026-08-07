@@ -14,7 +14,9 @@ If you have an idea for a new feature, please submit an issue using the "Feature
 We welcome Pull Requests (PRs)! As this is a curated open-source project, all PRs will be thoroughly reviewed and manually merged by the repository maintainer. 
 
 1. Fork the repository and create your branch from `develop`.
-2. Ensure your code follows the existing style and architecture.
-3. If you've added code that should be tested, add tests to `tests/`.
-4. Update the `README.md` with details of changes to the interface, if applicable.
-5. Issue that PR!
+  - recomended style (fix/your-branch-name) for fixes, and (features/your-feature-name) for features.
+3. Ensure your code follows the existing style and architecture.
+4. If you've added code that should be tested, add tests to `tests/`.
+5. Update the `README.md` with details of changes to the interface, if applicable.
+6. Issue that PR! (preferably, create the PR from your new branch to the main develop branch)
+7. When enough/necesssary updates are made on the develop, they will be pushed to the main on a new release.
