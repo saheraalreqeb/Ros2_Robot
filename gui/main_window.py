@@ -1975,9 +1975,9 @@ class MainWindow(QMainWindow):
 
         btn_kill_all = _action_btn("Kill All Nodes", "fa5s.times-circle")
         btn_kill_all.setObjectName("btnKillAllNodes")
-        btn_kill_all.setStyleSheet(
-            f"background-color: {ThemeManager.palette()['danger']}; color: white;"
-        )
+        btn_kill_all.setProperty("class", "btn-danger")
+        btn_kill_all.style().unpolish(btn_kill_all)
+        btn_kill_all.style().polish(btn_kill_all)
         btn_kill_all.clicked.connect(self._kill_all_running_nodes)
         hdr.addWidget(btn_kill_all)
         hdr.addSpacing(10)
@@ -2135,10 +2135,22 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        self._nodes_dirty = True
+        # Update card UI elements immediately
+        for card in getattr(self, "active_node_cards", []):
+            if hasattr(card, "btn_run"):
+                card.btn_run.setText("Run")
+                card.btn_run.setProperty("class", "btn-success")
+                card.btn_run.setStyleSheet("")
+                card.btn_run.style().unpolish(card.btn_run)
+                card.btn_run.style().polish(card.btn_run)
+            if hasattr(card, "lbl_cpu"):
+                card.lbl_cpu.setText("CPU: --")
+                card.lbl_mem.setText("Memory: --")
+                card.lbl_threads.setText("Threads: --")
+            card.process_obj = None
+
         if hasattr(self, "_running_dict_cache"):
             del self._running_dict_cache
-        self._refresh_nodes_list()
 
     def _make_node_card(self, pkg_name: str, node_name: str, running_dict=None) -> QFrame:
         card = QFrame()
@@ -2305,6 +2317,8 @@ class MainWindow(QMainWindow):
             self._kill_node(pkg_name, node_name)
             if proc_key in self.running_processes:
                 del self.running_processes[proc_key]
+            if hasattr(self, "_running_dict_cache"):
+                del self._running_dict_cache
             btn.setText("Run")
             btn.setProperty("class", "btn-success")
             btn.setStyleSheet("")  # Clear any explicit styles if present
