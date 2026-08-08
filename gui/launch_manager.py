@@ -458,6 +458,10 @@ class LaunchManagerPage(QWidget):
 
         p = ThemeManager.palette()
         dlg = QDialog(self)
+        dlg.setAttribute(Qt.WA_StyledBackground, True)
+        from gui.dialogs import center_dialog_on_parent
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: center_dialog_on_parent(dlg))
         dlg.setWindowTitle(f"Launch Log, {filename}")
         dlg.resize(700, 400)
         dlg.setStyleSheet(
@@ -573,8 +577,16 @@ class LaunchBuilderDialog(QDialog):
 
         self.setWindowTitle("Launch File Builder")
         self.resize(720, 620)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._apply_dialog_style()
         self._build_ui()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        from gui.dialogs import center_dialog_on_parent
+        center_dialog_on_parent(self)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: center_dialog_on_parent(self))
 
     # ── Styling ───────────────────────────────────────────────────────────
 

@@ -14,22 +14,30 @@ class CodeGenerator:
         return True, ""
 
     @staticmethod
+    def _sanitize_names(node_name: str) -> tuple[str, str]:
+        """Returns (safe_module_name, class_name) with hyphens converted to underscores and valid identifiers."""
+        safe_module_name = node_name.replace('-', '_')
+        class_name = f"{safe_module_name.capitalize()}Node"
+        return safe_module_name, class_name
+
+    @staticmethod
     def generate_python_node(package_dir: str, package_name: str, node_name: str) -> str:
         """
         Generates a boilerplate 'Hello World' Python node inside a target package's directory.
         Returns the path to the generated file.
         """
+        safe_module_name, class_name = CodeGenerator._sanitize_names(node_name)
         content = f"""import rclpy
 from rclpy.node import Node
 
-class {node_name.capitalize()}Node(Node):
+class {class_name}(Node):
     def __init__(self):
         super().__init__('{node_name}')
         self.get_logger().info('Hello World from {node_name}')
 
 def main(args=None):
     rclpy.init(args=args)
-    node = {node_name.capitalize()}Node()
+    node = {class_name}()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
@@ -37,7 +45,7 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 """
-        node_file_name = f"{node_name}.py"
+        node_file_name = f"{safe_module_name}.py"
         target_dir = os.path.join(package_dir, package_name)
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
@@ -59,7 +67,7 @@ if __name__ == '__main__':
         Generates a Python lifecycle node using rclpy.lifecycle.LifecycleNode.
         Returns the path to the generated file.
         """
-        class_name = f"{node_name.capitalize()}Node"
+        safe_module_name, class_name = CodeGenerator._sanitize_names(node_name)
         content = f"""import rclpy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
@@ -103,7 +111,7 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 """
-        node_file_name = f"{node_name}.py"
+        node_file_name = f"{safe_module_name}.py"
         target_dir = os.path.join(package_dir, package_name)
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(target_dir, node_file_name)
@@ -172,6 +180,8 @@ int main(int argc, char * argv[])
         if module_name is None:
             module_name = node_name
 
+        safe_module_name = module_name.replace('-', '_')
+
         if not os.path.exists(setup_py_path):
             raise FileNotFoundError(f"setup.py not found at {setup_py_path}")
 
@@ -189,7 +199,7 @@ int main(int argc, char * argv[])
         existing_scripts = match.group(2)
         suffix = match.group(3)
 
-        entry_point_str = f"{node_name} = {package_name}.{module_name}:main"
+        entry_point_str = f"{node_name} = {package_name}.{safe_module_name}:main"
 
         if entry_point_str in existing_scripts:
             return  # Entry point already exists

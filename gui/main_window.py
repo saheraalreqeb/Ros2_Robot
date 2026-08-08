@@ -60,7 +60,7 @@ from core.code_generator import CodeGenerator
 from core.ros2_cli import ROS2CLI
 from core.workspace import ROS2Workspace
 from gui.bag_manager import BagManagerPage
-from gui.dialogs import CreateNodeDialog, CreatePackageDialog, NodeProfileDialog
+from gui.dialogs import CreateNodeDialog, CreatePackageDialog, NodeProfileDialog, InitWorkspaceDialog, center_dialog_on_parent
 from core.node_profiles import NodeProfileManager
 from gui.flow_layout import FlowLayout
 from gui.launch_manager import LaunchManagerPage
@@ -138,17 +138,17 @@ class ResourceMonitorWorker(QThread):
                 m = re.search(r'install/([^\s]+)/lib/\1/([^\s]+)', cmd_str)
                 if m:
                     pkg, node = m.groups()
-                    running[(pkg, node)] = proc
+                    running[f"{pkg}:{node}"] = proc
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
                 
         metrics = {}
-        for (pkg, node), proc in running.items():
+        for key, proc in running.items():
             try:
                 cpu = proc.cpu_percent(interval=None)
                 mem_rss = proc.memory_info().rss / (1024 * 1024)
                 threads = proc.num_threads()
-                metrics[(pkg, node)] = {"cpu": cpu, "mem": mem_rss, "threads": threads}
+                metrics[key] = {"cpu": cpu, "mem": mem_rss, "threads": threads}
             except:
                 pass
         self.resources_updated.emit(metrics)
@@ -435,7 +435,6 @@ _TAB_KEY_FOR_BTN = {
     "btn_settings":       "settings",
 }
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  HelpButtonResizer
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +462,16 @@ class HelpDialog(QDialog):
         self.setWindowTitle(f"Help: {page_data.get('title', 'Page Help')}")
         self.setMinimumSize(520, 460)
         self.resize(580, 500)
-        
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._build_ui(page_data)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        center_dialog_on_parent(self)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: center_dialog_on_parent(self))
+
+    def _build_ui(self, page_data: dict):
         # Apply theme colors
         p = ThemeManager.palette()
         self.setStyleSheet(
@@ -649,8 +657,13 @@ class MainWindow(QMainWindow):
         self._current_workspace_path_val = os.getcwd()
         self.setWindowTitle("Ros2 Robot")
         from PySide6.QtWidgets import QApplication
-        self.setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
-        QApplication.instance().setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
+        if QApplication.instance():
+            try:
+                ic = ThemeManager.icon("fa5s.robot", "accent")
+                self.setWindowIcon(ic)
+                QApplication.instance().setWindowIcon(ic)
+            except Exception:
+                pass
         self.resize(1180, 780)
         self.setMinimumSize(900, 600)
         
@@ -667,7 +680,9 @@ class MainWindow(QMainWindow):
         self.cli = ROS2CLI()
         if os.name == "nt":
             self.cli.use_wsl = True
+        # Track running node processes and their log readers
         self.running_processes: dict = {}
+        self.running_readers: dict = {}
         self.active_node_cards: list = []
         self.node_profile_manager = NodeProfileManager(self.current_workspace_path)
 
@@ -850,8 +865,17 @@ class MainWindow(QMainWindow):
             _safe_stop_thread(self._bg_build_thread, 3000)
 
         # ── Running process log readers ──
-        for key, proc in list(getattr(self, "running_processes", {}).items()):
-            _safe_stop_thread(proc, 3000)
+        for reader in list(getattr(self, "running_readers", {}).values()):
+            _safe_stop_thread(reader, 3000)
+        self.running_readers.clear()
+
+        # ── Running subprocesses ──
+        for proc in list(getattr(self, "running_processes", {}).values()):
+            if proc is not None and hasattr(proc, "poll") and proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
         self.running_processes.clear()
 
         # ── QStackedWidget page cleanup ──
@@ -897,6 +921,8 @@ class MainWindow(QMainWindow):
             dialog.setLabelText("Choose the default IDE to open files with:\n(You can change this later in Settings)")
             dialog.setComboBoxItems(items)
             dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: center_dialog_on_parent(dialog))
             
             if dialog.exec() == QInputDialog.Accepted:
                 item = dialog.textValue()
@@ -2237,6 +2263,12 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
         self.running_processes.clear()
+        
+        # Stop and clear log readers to free QThreads
+        for reader in self.running_readers.values():
+            if reader.isRunning():
+                reader.terminate()
+        self.running_readers.clear()
 
         # Terminate system processes for nodes
         running_procs = self._scan_running_processes()
@@ -2356,6 +2388,7 @@ class MainWindow(QMainWindow):
 
     def _configure_node_profile(self, pkg_name: str, node_name: str):
         dialog = NodeProfileDialog(self, self.node_profile_manager, pkg_name, node_name)
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             self.node_profile_manager.save_profile(pkg_name, node_name, data["profile_name"], data)
@@ -2416,6 +2449,18 @@ class MainWindow(QMainWindow):
     def _kill_node(self, pkg_name, node_name):
         target_path = f"install/{pkg_name}/lib/{pkg_name}/{node_name}"
         target_cmd = f"ros2 run {pkg_name} {node_name}"
+        
+        # Kill the Linux processes if running inside WSL
+        if self.cli and self.cli.use_wsl:
+            try:
+                import subprocess
+                subprocess.run(["wsl", "bash", "-c", f"pkill -f '{target_cmd}'"], check=False)
+                subprocess.run(["wsl", "bash", "-c", f"pkill -f '{target_path}'"], check=False)
+            except Exception as e:
+                pass
+
+        # Kill the Windows processes tracking them
+        import psutil
         for proc in psutil.process_iter(["cmdline"]):
             try:
                 cmdline = proc.info.get("cmdline")
@@ -2512,6 +2557,7 @@ class MainWindow(QMainWindow):
             # Start process output reader thread
             reader = ProcessLogReader(f"Node: {pkg_name}/{node_name}", proc, self)
             reader.new_line.connect(self._on_node_log_received)
+            self.running_readers[proc_key] = reader
             reader.start()
 
     def _update_node_resources(self):
@@ -2533,8 +2579,9 @@ class MainWindow(QMainWindow):
         for card in getattr(self, "active_node_cards", []):
             pkg = card.pkg_name
             node = card.node_name
+            key = f"{pkg}:{node}"
 
-            data = metrics.get((pkg, node))
+            data = metrics.get(key)
 
             if data:
                 card.lbl_cpu.setText(f"CPU: {data['cpu']:.1f}%")
@@ -2742,24 +2789,32 @@ class MainWindow(QMainWindow):
             self.current_workspace_path = dir_path
 
     def _mock_init_workspace(self):
-        name, ok = QInputDialog.getText(
-            self, "New Workspace", "Enter workspace name:"
-        )
-        if not ok or not name:
-            return
-        try:
-            new_path = os.path.join(self.current_workspace_path, name)
-            os.makedirs(os.path.join(new_path, "src"), exist_ok=True)
-            self.current_workspace_path = new_path
-            QMessageBox.information(
-                self, "Success",
-                f"Workspace '{name}' initialised at:\n{new_path}"
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
+        dialog = InitWorkspaceDialog(self)
+        center_dialog_on_parent(dialog)
+        if dialog.exec():
+            data = dialog.get_data()
+            name = data.get("name", "").strip()
+            location = data.get("location", "").strip()
+            if not name:
+                QMessageBox.warning(self, "Warning", "Workspace name cannot be empty.")
+                return
+            if not location:
+                QMessageBox.warning(self, "Warning", "Workspace location directory cannot be empty.")
+                return
+            try:
+                new_path = os.path.join(location, name)
+                os.makedirs(os.path.join(new_path, "src"), exist_ok=True)
+                self.current_workspace_path = new_path
+                QMessageBox.information(
+                    self, "Success",
+                    f"Workspace '{name}' initialised at:\n{new_path}"
+                )
+            except Exception as exc:
+                QMessageBox.critical(self, "Error", f"Failed to initialize workspace:\n{exc}")
 
     def _mock_create_package(self):
         dialog = CreatePackageDialog(self)
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             pkg_name = data.get("name", "").strip()
@@ -2797,6 +2852,7 @@ class MainWindow(QMainWindow):
         for pkg in packages:
             dialog.pkg_combo.addItem(pkg["name"])
 
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             node_name = data["name"]

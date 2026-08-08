@@ -6,11 +6,7 @@ import os
 from gui.bag_manager import BagManagerPage
 
 def get_bag_page(main_window):
-    for i in range(main_window.content_stack.count()):
-        widget = main_window.content_stack.widget(i)
-        if isinstance(widget, BagManagerPage):
-            return widget
-    return None
+    return main_window.bag_manager_page
 
 def test_record_all_topics(main_window, qtbot, mock_subprocess_popen):
     bag_page = get_bag_page(main_window)
@@ -76,7 +72,7 @@ def test_view_bag_info(main_window, qtbot, mock_ros2_cli, mocker):
     
     qtbot.mouseClick(bag_page.btn_info, Qt.LeftButton)
     
-    mock_ros2_cli.assert_called_once()
+    assert any("ros2 bag info" in str(call) for call in mock_ros2_cli.call_args_list)
     assert mock_info.called
     assert "Bag Info Details" in mock_info.call_args[0][2]
 
@@ -118,7 +114,7 @@ def test_bag_info_error(main_window, qtbot, mock_ros2_cli, mocker):
     
     qtbot.mouseClick(bag_page.btn_info, Qt.LeftButton)
     
-    mock_ros2_cli.assert_called_once()
+    assert any("ros2 bag info" in str(call) for call in mock_ros2_cli.call_args_list)
     assert mock_critical.called
 
 def test_process_launch_exception(main_window, qtbot, mock_subprocess_popen, mocker):

@@ -263,6 +263,10 @@ class _ToolRow(QFrame):
             open_term_btn = msg_box.addButton("Open Terminal", QMessageBox.ActionRole)
             cancel_btn = msg_box.addButton(QMessageBox.Cancel)
 
+            from gui.dialogs import center_dialog_on_parent
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: center_dialog_on_parent(msg_box))
+
             msg_box.exec()
 
             if msg_box.clickedButton() == open_term_btn:
