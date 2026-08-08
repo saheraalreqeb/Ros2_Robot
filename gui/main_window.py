@@ -138,17 +138,17 @@ class ResourceMonitorWorker(QThread):
                 m = re.search(r'install/([^\s]+)/lib/\1/([^\s]+)', cmd_str)
                 if m:
                     pkg, node = m.groups()
-                    running[(pkg, node)] = proc
+                    running[f"{pkg}:{node}"] = proc
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
                 
         metrics = {}
-        for (pkg, node), proc in running.items():
+        for key, proc in running.items():
             try:
                 cpu = proc.cpu_percent(interval=None)
                 mem_rss = proc.memory_info().rss / (1024 * 1024)
                 threads = proc.num_threads()
-                metrics[(pkg, node)] = {"cpu": cpu, "mem": mem_rss, "threads": threads}
+                metrics[key] = {"cpu": cpu, "mem": mem_rss, "threads": threads}
             except:
                 pass
         self.resources_updated.emit(metrics)
@@ -649,8 +649,13 @@ class MainWindow(QMainWindow):
         self._current_workspace_path_val = os.getcwd()
         self.setWindowTitle("Ros2 Robot")
         from PySide6.QtWidgets import QApplication
-        self.setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
-        QApplication.instance().setWindowIcon(ThemeManager.icon("fa5s.robot", "accent"))
+        if QApplication.instance():
+            try:
+                ic = ThemeManager.icon("fa5s.robot", "accent")
+                self.setWindowIcon(ic)
+                QApplication.instance().setWindowIcon(ic)
+            except Exception:
+                pass
         self.resize(1180, 780)
         self.setMinimumSize(900, 600)
         
@@ -667,7 +672,9 @@ class MainWindow(QMainWindow):
         self.cli = ROS2CLI()
         if os.name == "nt":
             self.cli.use_wsl = True
+        # Track running node processes and their log readers
         self.running_processes: dict = {}
+        self.running_readers: dict = {}
         self.active_node_cards: list = []
         self.node_profile_manager = NodeProfileManager(self.current_workspace_path)
 
@@ -850,8 +857,17 @@ class MainWindow(QMainWindow):
             _safe_stop_thread(self._bg_build_thread, 3000)
 
         # ── Running process log readers ──
-        for key, proc in list(getattr(self, "running_processes", {}).items()):
-            _safe_stop_thread(proc, 3000)
+        for reader in list(getattr(self, "running_readers", {}).values()):
+            _safe_stop_thread(reader, 3000)
+        self.running_readers.clear()
+
+        # ── Running subprocesses ──
+        for proc in list(getattr(self, "running_processes", {}).values()):
+            if proc is not None and hasattr(proc, "poll") and proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
         self.running_processes.clear()
 
         # ── QStackedWidget page cleanup ──
@@ -2237,6 +2253,12 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
         self.running_processes.clear()
+        
+        # Stop and clear log readers to free QThreads
+        for reader in self.running_readers.values():
+            if reader.isRunning():
+                reader.terminate()
+        self.running_readers.clear()
 
         # Terminate system processes for nodes
         running_procs = self._scan_running_processes()
@@ -2416,6 +2438,18 @@ class MainWindow(QMainWindow):
     def _kill_node(self, pkg_name, node_name):
         target_path = f"install/{pkg_name}/lib/{pkg_name}/{node_name}"
         target_cmd = f"ros2 run {pkg_name} {node_name}"
+        
+        # Kill the Linux processes if running inside WSL
+        if self.cli and self.cli.use_wsl:
+            try:
+                import subprocess
+                subprocess.run(["wsl", "bash", "-c", f"pkill -f '{target_cmd}'"], check=False)
+                subprocess.run(["wsl", "bash", "-c", f"pkill -f '{target_path}'"], check=False)
+            except Exception as e:
+                pass
+
+        # Kill the Windows processes tracking them
+        import psutil
         for proc in psutil.process_iter(["cmdline"]):
             try:
                 cmdline = proc.info.get("cmdline")
@@ -2512,6 +2546,7 @@ class MainWindow(QMainWindow):
             # Start process output reader thread
             reader = ProcessLogReader(f"Node: {pkg_name}/{node_name}", proc, self)
             reader.new_line.connect(self._on_node_log_received)
+            self.running_readers[proc_key] = reader
             reader.start()
 
     def _update_node_resources(self):
@@ -2533,8 +2568,9 @@ class MainWindow(QMainWindow):
         for card in getattr(self, "active_node_cards", []):
             pkg = card.pkg_name
             node = card.node_name
+            key = f"{pkg}:{node}"
 
-            data = metrics.get((pkg, node))
+            data = metrics.get(key)
 
             if data:
                 card.lbl_cpu.setText(f"CPU: {data['cpu']:.1f}%")
