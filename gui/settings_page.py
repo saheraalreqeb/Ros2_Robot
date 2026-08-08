@@ -454,12 +454,16 @@ class SettingsPage(QWidget):
             
         items = [ide["name"] for ide in ides]
         
-        dialog = QInputDialog(self)
+        dialog = QInputDialog(self.window())
         dialog.setWindowTitle("Select IDE")
         dialog.setLabelText("Choose the default IDE to open files with:")
         dialog.setComboBoxItems(items)
         dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
         dialog.setStyleSheet(self.window().styleSheet())
+        from gui.dialogs import center_dialog_on_parent
+        center_dialog_on_parent(dialog)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: center_dialog_on_parent(dialog))
         
         if dialog.exec() == QInputDialog.Accepted:
             item = dialog.textValue()

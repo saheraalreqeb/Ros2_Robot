@@ -60,7 +60,7 @@ from core.code_generator import CodeGenerator
 from core.ros2_cli import ROS2CLI
 from core.workspace import ROS2Workspace
 from gui.bag_manager import BagManagerPage
-from gui.dialogs import CreateNodeDialog, CreatePackageDialog, NodeProfileDialog
+from gui.dialogs import CreateNodeDialog, CreatePackageDialog, NodeProfileDialog, InitWorkspaceDialog, center_dialog_on_parent
 from core.node_profiles import NodeProfileManager
 from gui.flow_layout import FlowLayout
 from gui.launch_manager import LaunchManagerPage
@@ -435,7 +435,6 @@ _TAB_KEY_FOR_BTN = {
     "btn_settings":       "settings",
 }
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  HelpButtonResizer
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +462,16 @@ class HelpDialog(QDialog):
         self.setWindowTitle(f"Help: {page_data.get('title', 'Page Help')}")
         self.setMinimumSize(520, 460)
         self.resize(580, 500)
-        
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._build_ui(page_data)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        center_dialog_on_parent(self)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: center_dialog_on_parent(self))
+
+    def _build_ui(self, page_data: dict):
         # Apply theme colors
         p = ThemeManager.palette()
         self.setStyleSheet(
@@ -913,6 +921,8 @@ class MainWindow(QMainWindow):
             dialog.setLabelText("Choose the default IDE to open files with:\n(You can change this later in Settings)")
             dialog.setComboBoxItems(items)
             dialog.setOption(QInputDialog.UseListViewForComboBoxItems)
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: center_dialog_on_parent(dialog))
             
             if dialog.exec() == QInputDialog.Accepted:
                 item = dialog.textValue()
@@ -2378,6 +2388,7 @@ class MainWindow(QMainWindow):
 
     def _configure_node_profile(self, pkg_name: str, node_name: str):
         dialog = NodeProfileDialog(self, self.node_profile_manager, pkg_name, node_name)
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             self.node_profile_manager.save_profile(pkg_name, node_name, data["profile_name"], data)
@@ -2778,24 +2789,32 @@ class MainWindow(QMainWindow):
             self.current_workspace_path = dir_path
 
     def _mock_init_workspace(self):
-        name, ok = QInputDialog.getText(
-            self, "New Workspace", "Enter workspace name:"
-        )
-        if not ok or not name:
-            return
-        try:
-            new_path = os.path.join(self.current_workspace_path, name)
-            os.makedirs(os.path.join(new_path, "src"), exist_ok=True)
-            self.current_workspace_path = new_path
-            QMessageBox.information(
-                self, "Success",
-                f"Workspace '{name}' initialised at:\n{new_path}"
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Error", f"Failed:\n{exc}")
+        dialog = InitWorkspaceDialog(self)
+        center_dialog_on_parent(dialog)
+        if dialog.exec():
+            data = dialog.get_data()
+            name = data.get("name", "").strip()
+            location = data.get("location", "").strip()
+            if not name:
+                QMessageBox.warning(self, "Warning", "Workspace name cannot be empty.")
+                return
+            if not location:
+                QMessageBox.warning(self, "Warning", "Workspace location directory cannot be empty.")
+                return
+            try:
+                new_path = os.path.join(location, name)
+                os.makedirs(os.path.join(new_path, "src"), exist_ok=True)
+                self.current_workspace_path = new_path
+                QMessageBox.information(
+                    self, "Success",
+                    f"Workspace '{name}' initialised at:\n{new_path}"
+                )
+            except Exception as exc:
+                QMessageBox.critical(self, "Error", f"Failed to initialize workspace:\n{exc}")
 
     def _mock_create_package(self):
         dialog = CreatePackageDialog(self)
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             pkg_name = data.get("name", "").strip()
@@ -2833,6 +2852,7 @@ class MainWindow(QMainWindow):
         for pkg in packages:
             dialog.pkg_combo.addItem(pkg["name"])
 
+        center_dialog_on_parent(dialog)
         if dialog.exec():
             data = dialog.get_data()
             node_name = data["name"]

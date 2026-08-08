@@ -131,3 +131,17 @@ def test_workspace_parse_package_fallback(tmp_path):
     assert 'scan_node' in pkgs[0]['nodes']
     assert 'helper' in pkgs[0]['nodes']
     assert '__init__' not in pkgs[0]['nodes']
+
+
+def test_init_workspace_dialog_get_data(qtbot):
+    from gui.dialogs import InitWorkspaceDialog
+    import os
+    dlg = InitWorkspaceDialog()
+    qtbot.addWidget(dlg)
+    dlg.name_edit.setText("my_test_ws")
+    home = os.path.expanduser("~")
+    assert dlg.path_edit.text() == home
+    data = dlg.get_data()
+    assert data["name"] == "my_test_ws"
+    assert data["location"] == home
+
