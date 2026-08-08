@@ -133,6 +133,7 @@ def test_workspace_parse_package_fallback(tmp_path):
     assert '__init__' not in pkgs[0]['nodes']
 
 
+@pytest.mark.gui
 def test_init_workspace_dialog_get_data(qtbot):
     from gui.dialogs import InitWorkspaceDialog
     import os
