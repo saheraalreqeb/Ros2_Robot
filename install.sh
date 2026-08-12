@@ -80,6 +80,25 @@ else
 fi
 echo "        ✓  Qt platform dependencies"
 
+# ── 1.5. ROS 2 dependencies ────────────────────────────────────────────────
+echo "[ 1.5/5 ] Installing ROS 2 specific dependencies..."
+if command -v ros2 &> /dev/null; then
+    if [ -n "$ROS_DISTRO" ]; then
+        if command -v apt-get &> /dev/null; then
+            $SUDO apt-get update -q 2>/dev/null || true
+            $SUDO apt-get install -y -q ros-$ROS_DISTRO-rmw-cyclonedds-cpp 2>/dev/null || true
+            echo "        ✓  Installed Cyclone DDS for ROS 2 $ROS_DISTRO"
+        elif command -v dnf &> /dev/null; then
+            $SUDO dnf install -y -q ros-$ROS_DISTRO-rmw-cyclonedds-cpp 2>/dev/null || true
+            echo "        ✓  Installed Cyclone DDS for ROS 2 $ROS_DISTRO"
+        fi
+    else
+        echo "        ⚠  ROS 2 command found, but ROS_DISTRO is not set. Ensure ROS 2 is sourced."
+    fi
+else
+    echo "        ⚠  ROS 2 not found in PATH. Skipping ROS 2 dependencies."
+fi
+
 # ── 2. Python dependencies ─────────────────────────────────────────────────
 echo "[ 2/5 ] Installing Python dependencies..."
 if ! command -v pip3 &> /dev/null || ! python3 -c "import ensurepip" &>/dev/null; then
