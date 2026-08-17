@@ -2891,6 +2891,15 @@ class MainWindow(QMainWindow):
                         CodeGenerator.generate_cpp_lifecycle_node(
                             pkg_info["path"], pkg_name, node_name
                         )
+                        CodeGenerator.modify_cmakelists(
+                            os.path.join(pkg_info["path"], "CMakeLists.txt"),
+                            node_name,
+                            lifecycle=True
+                        )
+                        CodeGenerator.modify_package_xml(
+                            os.path.join(pkg_info["path"], "package.xml"),
+                            "rclcpp_lifecycle"
+                        )
                     else:
                         CodeGenerator.generate_cpp_node(
                             pkg_info["path"], pkg_name, node_name
